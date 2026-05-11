@@ -1,0 +1,571 @@
+@import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Hide scrollbar utility */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  font-family: 'Courier Prime', monospace;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #fbfaf5;
+  color: #1c1b1b;
+}
+
+/* Material Symbols */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #e5e2e1;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #c4c7c7;
+}
+
+.settings-scroll-panel {
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+}
+
+.settings-scroll-panel::-webkit-scrollbar {
+  width: 3px;
+}
+
+.settings-scroll-panel::-webkit-scrollbar-thumb {
+  background: #d8d4d2;
+  border-radius: 999px;
+}
+
+/* Receipt paper effect */
+.receipt-paper {
+  background-color: #fbfaf5;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Jagged edge effect for receipts */
+.jagged-bottom::after {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background-size: 16px 16px;
+  background-image: linear-gradient(45deg, transparent 50%, #fdf8f8 50%), linear-gradient(-45deg, transparent 50%, #fdf8f8 50%);
+  background-position: 0 0, 8px 0;
+}
+
+.jagged-top::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background-size: 16px 16px;
+  background-image: linear-gradient(135deg, transparent 50%, #fdf8f8 50%), linear-gradient(225deg, transparent 50%, #fdf8f8 50%);
+  background-position: 0 0, 8px 0;
+}
+
+/* Dashed line utility */
+.dashed-divider {
+  border-top: 1px dashed #c4c7c7;
+}
+
+/* Daily receipt screen */
+.daily-receipt-screen {
+  width: 100%;
+  min-height: calc(100vh - 32px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.daily-receipt-card {
+  width: 45vw;
+  max-width: 420px;
+  min-width: 280px;
+  height: min(760px, calc(100vh - 32px));
+  overflow-y: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 26px 22px 28px;
+  color: #1c1b1b;
+  background: #fbfaf5;
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}
+
+.daily-receipt-card::-webkit-scrollbar {
+  width: 0;
+}
+
+.daily-receipt-paper {
+  position: relative;
+  width: 100%;
+  max-width: 312px;
+  margin: 0 auto;
+  padding: 24px 20px 18px;
+  overflow: visible;
+  color: #111111;
+  font-family: 'Courier Prime', monospace;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 18%, rgba(0, 0, 0, 0.018) 52%, rgba(255, 255, 255, 0) 88%),
+    radial-gradient(rgba(0, 0, 0, 0.035) 0.55px, transparent 0.72px),
+    #fffefa;
+  background-size: auto, 6px 6px, auto;
+  border: 1px solid rgba(28, 27, 27, 0.11);
+  border-radius: 22px;
+  box-shadow: 0 10px 24px rgba(28, 27, 27, 0.1);
+}
+
+.daily-receipt-paper::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -13px;
+  width: 100%;
+  height: 15px;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 18%, rgba(0, 0, 0, 0.018) 52%, rgba(255, 255, 255, 0) 88%),
+    radial-gradient(rgba(0, 0, 0, 0.035) 0.55px, transparent 0.72px),
+    #fffefa;
+  background-size: auto, 6px 6px, auto;
+  clip-path: polygon(0 0, 4% 36%, 8% 18%, 13% 48%, 18% 22%, 24% 58%, 30% 30%, 37% 48%, 44% 18%, 51% 60%, 58% 28%, 65% 50%, 72% 20%, 79% 54%, 86% 24%, 93% 46%, 100% 18%, 100% 100%, 0 100%);
+  filter: drop-shadow(0 5px 5px rgba(28, 27, 27, 0.11));
+}
+
+.daily-receipt-corner-actions {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: flex;
+  gap: 4px;
+}
+
+.daily-receipt-icon-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: rgba(28, 27, 27, 0.56);
+  background: transparent;
+  border-radius: 999px;
+}
+
+.daily-receipt-icon-action:hover {
+  color: #1c1b1b;
+  background: rgba(28, 27, 27, 0.05);
+}
+
+.daily-receipt-action-icon {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.daily-receipt-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+}
+
+.daily-receipt-ascii-logo {
+  margin: 0;
+  font-family: 'Courier Prime', monospace;
+  font-size: 7px;
+  line-height: 0.78;
+  font-weight: 700;
+  color: rgba(17, 17, 17, 0.48);
+  white-space: pre;
+}
+
+.daily-receipt-logo-caption {
+  margin: 0 0 5px;
+  font-size: 8px;
+  line-height: 1;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.daily-receipt-company {
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.daily-receipt-subtitle {
+  font-size: 10px;
+  line-height: 1.1;
+  color: #111111;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.daily-receipt-date {
+  font-size: 9px;
+  line-height: 1.15;
+  color: #111111;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.daily-receipt-divider {
+  height: 1px;
+  margin: 10px 0;
+  background-image: repeating-linear-gradient(to right, #111111 0 2px, transparent 2px 4px);
+  opacity: 0.72;
+}
+
+.daily-receipt-section {
+  padding: 13px 0 7px;
+}
+
+.daily-receipt-section h2 {
+  margin: 0 0 12px;
+  font-size: 10px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.daily-receipt-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.daily-receipt-row {
+  display: flex;
+  align-items: baseline;
+  width: 100%;
+  gap: 4px;
+  color: #111111;
+  font-size: 9px;
+  line-height: 1.08;
+  letter-spacing: 0;
+}
+
+.daily-receipt-row-label,
+.daily-receipt-row-value {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.daily-receipt-row-value {
+  text-align: right;
+}
+
+.daily-receipt-row-dots {
+  flex: 1 1 auto;
+  min-width: 12px;
+  height: 1px;
+  transform: translateY(-2px);
+  opacity: 0.72;
+  background-image: repeating-linear-gradient(to right, #111111 0 1px, transparent 1px 2px);
+}
+
+.daily-receipt-row-strong {
+  font-weight: 700;
+  font-size: 9px;
+  gap: 4px;
+}
+
+.daily-receipt-row-strong .daily-receipt-row-dots {
+  min-width: 8px;
+}
+
+.daily-receipt-score {
+  margin: 15px 0 12px;
+  padding: 11px 8px 10px;
+  border-radius: 8px;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.03);
+}
+
+.daily-receipt-score-main {
+  margin: 0 0 9px;
+  font-size: 11px;
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.daily-receipt-streak {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 9px;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.daily-receipt-flame-icon {
+  width: 11px;
+  height: 11px;
+  fill: currentColor;
+}
+
+.daily-receipt-score-line {
+  height: 1px;
+  width: 76%;
+  margin: 9px auto 7px;
+  background-image: repeating-linear-gradient(to right, #111111 0 2px, transparent 2px 4px);
+  opacity: 0.72;
+}
+
+.daily-receipt-quote {
+  margin: 0;
+  color: #111111;
+  font-size: 8px;
+  line-height: 1.2;
+  font-style: italic;
+  letter-spacing: 0;
+}
+
+.daily-receipt-footer-divider {
+  margin-top: 14px;
+}
+
+.daily-receipt-footer {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  padding: 5px 0 6px;
+}
+
+.daily-receipt-text-action {
+  width: auto;
+  color: rgba(28, 27, 27, 0.68);
+  background: transparent;
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .daily-receipt-card {
+    width: 100%;
+    min-width: 0;
+    height: min(760px, calc(100vh - 32px));
+    padding: 22px 18px 24px;
+  }
+
+  .daily-receipt-paper {
+    max-width: 100%;
+  }
+}
+
+/* Button reset and styling */
+button {
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+}
+
+button[type="submit"],
+button[class*="bg-primary"] {
+  background-color: #1e1e1e;
+  color: #ffffff;
+}
+
+button[type="submit"]:hover,
+button[class*="bg-primary"]:hover {
+  background-color: #333333;
+}
+
+button[type="submit"]:active,
+button[class*="bg-primary"]:active {
+  background-color: #1a1a1a;
+}
+
+/* Focus styles for accessibility */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #1e1e1e;
+  outline-offset: 2px;
+}
+
+/* Input styling */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="time"] {
+  font-family: 'Courier Prime', monospace;
+}
+
+input[type="checkbox"] {
+  cursor: pointer;
+}
+
+/* Form elements */
+input::placeholder {
+  color: #c4c7c7;
+  opacity: 0.7;
+}
+
+input:focus {
+  outline: none;
+}
+
+/* Utility classes for receipt styling */
+.font-receipt-header {
+  font-family: 'Courier Prime', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.font-receipt-body {
+  font-family: 'Courier Prime', monospace;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.font-receipt-data {
+  font-family: 'Courier Prime', monospace;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 14px;
+  letter-spacing: -0.01em;
+}
+
+.font-ui-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 12px;
+  letter-spacing: 0.05em;
+}
+
+.font-nav-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+/* Responsive utilities */
+@media (max-width: 640px) {
+  .font-receipt-header {
+    font-size: 14px;
+  }
+
+  .font-receipt-body {
+    font-size: 11px;
+  }
+
+  .material-symbols-outlined {
+    font-size: 20px !important;
+  }
+
+  /* Adjust container padding on mobile */
+  main {
+    padding: 8px 12px;
+  }
+
+  /* Make buttons full width on mobile */
+  button[type="submit"],
+  button[class*="bg-primary"] {
+    width: 100%;
+  }
+
+  /* Reduce font size on mobile for better fit */
+  h1, h2, h3 {
+    font-size: 0.9em;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    font-size: 12px;
+  }
+
+  .font-receipt-header {
+    font-size: 12px;
+  }
+
+  .font-receipt-body {
+    font-size: 10px;
+  }
+
+  .font-ui-label {
+    font-size: 10px;
+  }
+
+  .receipt-paper,
+  .receipt-edge,
+  .receipt-edge-top,
+  .receipt-edge-bottom {
+    max-width: 100%;
+    width: 100%;
+  }
+}
+
+/* Landscape orientation */
+@media (orientation: landscape) and (max-height: 600px) {
+  main {
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+
+  .font-receipt-header {
+    font-size: 13px;
+  }
+}

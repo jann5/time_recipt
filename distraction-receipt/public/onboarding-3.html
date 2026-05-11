@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Onboarding 3 — Distraction Receipt</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      body { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+      .center { display:flex; align-items:center; justify-content:center; height:100vh; }
+    </style>
+  </head>
+  <body class="bg-gray-50">
+    <div class="center">
+      <div class="max-w-xl bg-white rounded-2xl p-8 shadow">
+        <h1 class="text-2xl font-bold mb-2">Uprawnienia</h1>
+        <p class="text-gray-600 mb-4">Włącz dostęp do informacji o aktywnej aplikacji, aby działało śledzenie.</p>
+        <div class="flex gap-3">
+          <a href="onboarding-4.html" class="px-4 py-2 bg-blue-600 text-white rounded">Dalej</a>
+          <a href="daily.html" class="px-4 py-2 border rounded">Pomiń</a>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+<!DOCTYPE html>
+
+<html lang="pl"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Onboarding - Konfiguracja</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Courier+Prime:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-variant": "#e5e2e1",
+                        "primary-fixed-dim": "#c8c6c6",
+                        "error": "#ba1a1a",
+                        "on-surface": "#1c1b1b",
+                        "inverse-primary": "#c8c6c6",
+                        "secondary-fixed": "#e3e2df",
+                        "on-error": "#ffffff",
+                        "secondary-fixed-dim": "#c7c7c3",
+                        "error-container": "#ffdad6",
+                        "on-secondary-container": "#626360",
+                        "on-tertiary-container": "#9f9b98",
+                        "on-surface-variant": "#444748",
+                        "on-error-container": "#93000a",
+                        "surface-container-low": "#f7f3f2",
+                        "surface-container": "#f1edec",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary": "#5e5f5c",
+                        "on-primary-fixed-variant": "#474747",
+                        "inverse-surface": "#313030",
+                        "outline-variant": "#c4c7c7",
+                        "inverse-on-surface": "#f4f0ef",
+                        "on-primary": "#ffffff",
+                        "surface-tint": "#5f5e5e",
+                        "on-tertiary-fixed-variant": "#494644",
+                        "surface": "#fdf8f8",
+                        "primary-fixed": "#e4e2e1",
+                        "on-secondary-fixed-variant": "#464744",
+                        "surface-bright": "#fdf8f8",
+                        "on-secondary": "#ffffff",
+                        "on-primary-fixed": "#1b1c1c",
+                        "outline": "#747878",
+                        "tertiary-fixed": "#e7e1de",
+                        "on-primary-container": "#9c9b9b",
+                        "on-tertiary-fixed": "#1d1b1a",
+                        "surface-container-high": "#ebe7e7",
+                        "tertiary-fixed-dim": "#cac6c2",
+                        "background": "#fdf8f8",
+                        "on-secondary-fixed": "#1b1c1a",
+                        "tertiary-container": "#353331",
+                        "surface-container-highest": "#e5e2e1",
+                        "on-background": "#1c1b1b",
+                        "secondary-container": "#e0e0dc",
+                        "primary-container": "#333333",
+                        "on-tertiary": "#ffffff",
+                        "surface-dim": "#ddd9d8",
+                        "primary": "#1e1e1e",
+                        "tertiary": "#201e1c"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "unit": "4px",
+                        "receipt-margin": "8px",
+                        "item-padding-y": "6px",
+                        "element-gap": "16px",
+                        "container-padding": "12px"
+                    },
+                    fontFamily: {
+                        "ui-label": ["Courier Prime"],
+                        "receipt-data": ["Courier Prime"],
+                        "nav-title": ["Courier Prime"],
+                        "receipt-body": ["Courier Prime"],
+                        "receipt-header": ["Courier Prime"]
+                    },
+                    fontSize: {
+                        "ui-label": ["11px", { lineHeight: "12px", fontWeight: "500" }],
+                        "receipt-data": ["11px", { lineHeight: "14px", letterSpacing: "-0.01em", fontWeight: "400" }],
+                        "nav-title": ["13px", { lineHeight: "16px", fontWeight: "600" }],
+                        "receipt-body": ["12px", { lineHeight: "18px", fontWeight: "400" }],
+                        "receipt-header": ["16px", { lineHeight: "20px", fontWeight: "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom scrollbar for receipt feel */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #e5e2e1;
+            border-radius: 4px;
+        }
+        .jagged-top {
+            position: relative;
+            background: #fdf8f8;
+        }
+        .jagged-top::before {
+            content: "";
+            position: absolute;
+            top: -8px;
+            left: 0;
+            right: 0;
+            height: 8px;
+            background-size: 16px 16px;
+            background-image: linear-gradient(135deg, transparent 50%, #fdf8f8 50%), linear-gradient(225deg, transparent 50%, #fdf8f8 50%);
+            background-position: 0 0, 8px 0;
+        }
+        .jagged-bottom {
+            position: relative;
+            background: #fdf8f8;
+        }
+        .jagged-bottom::after {
+            content: "";
+            position: absolute;
+            bottom: -8px;
+            left: 0;
+            right: 0;
+            height: 8px;
+            background-size: 16px 16px;
+            background-image: linear-gradient(45deg, transparent 50%, #fdf8f8 50%), linear-gradient(-45deg, transparent 50%, #fdf8f8 50%);
+            background-position: 0 0, 8px 0;
+        }
+    </style>
+</head>
+<body class="bg-surface-container-lowest min-h-screen flex items-center justify-center p-4 antialiased selection:bg-primary-container selection:text-on-primary-container">
+<!-- Desktop Environment (Level 0) with a subtle pattern to simulate a desk -->
+<div class="fixed inset-0 bg-[radial-gradient(#e5e2e1_1px,transparent_1px)] [background-size:16px_16px] opacity-30 pointer-events-none"></div>
+<!-- The Glass Shell (Level 1) -->
+<main class="relative w-full max-w-[360px] bg-surface-variant/70 backdrop-blur-xl border border-surface-container-highest shadow-2xl rounded-xl overflow-hidden flex flex-col">
+<!-- The Receipt Strip (Level 2) -->
+<div class="mx-receipt-margin my-6 bg-surface shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex flex-col jagged-bottom">
+<!-- Content Area -->
+<div class="p-container-padding flex flex-col gap-element-gap pt-6 pb-2">
+<!-- Onboarding Progress inside receipt -->
+<div class="text-center mb-2"><span class="font-receipt-header text-receipt-header font-bold text-on-surface-variant tracking-widest block w-full text-center">KROK 3/4</span></div>
+<!-- Header -->
+<div class="text-center flex flex-col gap-1">
+<h1 class="font-receipt-header text-receipt-header text-on-surface uppercase">TWÓJ ROZKŁAD DNIA</h1>
+<p class="font-receipt-body text-receipt-body text-on-surface-variant">Ty decydujesz, co jest rozproszeniem.</p>
+</div>
+<hr aria-hidden="true" class="border-t border-dashed border-outline-variant my-2"/>
+<!-- Section: Time Configuration -->
+<section class="flex flex-col gap-3">
+<label class="font-ui-label text-ui-label text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+                        Godzina wydruku
+                    </label>
+<div class="flex items-center justify-center gap-2 py-4 bg-surface-container-lowest border border-outline-variant/50 rounded-none">
+<div class="flex flex-col items-center gap-1">
+<button aria-label="Increase hours" class="text-outline hover:text-primary transition-colors rounded-none">
+<span class="material-symbols-outlined text-[20px]">keyboard_arrow_up</span>
+</button>
+<span class="font-receipt-header text-2xl text-on-surface">22</span>
+<button aria-label="Decrease hours" class="text-outline hover:text-primary transition-colors rounded-none">
+<span class="material-symbols-outlined text-[20px]">keyboard_arrow_down</span>
+</button>
+</div>
+<span class="font-receipt-header text-2xl text-on-surface-variant mb-6">:</span>
+<div class="flex flex-col items-center gap-1">
+<button aria-label="Increase minutes" class="text-outline hover:text-primary transition-colors rounded-none">
+<span class="material-symbols-outlined text-[20px]">keyboard_arrow_up</span>
+</button>
+<span class="font-receipt-header text-2xl text-on-surface">00</span>
+<button aria-label="Decrease minutes" class="text-outline hover:text-primary transition-colors rounded-none">
+<span class="material-symbols-outlined text-[20px]">keyboard_arrow_down</span>
+</button>
+</div>
+</div>
+</section>
+<hr aria-hidden="true" class="border-t border-dashed border-outline-variant my-2"/>
+<!-- Section: Distraction Apps -->
+<section class="flex flex-col gap-3">
+<label class="font-ui-label text-ui-label text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]">block</span>
+                        Zaznacz rozpraszacze
+                    </label>
+<ul class="flex flex-col gap-1 font-receipt-body text-receipt-body text-on-surface">
+<li class="flex justify-between items-center py-2 border-b border-dashed border-surface-variant">
+<span>YouTube</span>
+<input checked="" class="form-checkbox h-4 w-4 text-primary focus:ring-primary border-outline-variant rounded-none bg-transparent" type="checkbox"/>
+</li>
+<li class="flex justify-between items-center py-2 border-b border-dashed border-surface-variant">
+<span>Facebook</span>
+<input checked="" class="form-checkbox h-4 w-4 text-primary focus:ring-primary border-outline-variant rounded-none bg-transparent" type="checkbox"/>
+</li>
+<li class="flex justify-between items-center py-2 border-b border-dashed border-surface-variant">
+<span>Netflix</span>
+<input class="form-checkbox h-4 w-4 text-primary focus:ring-primary border-outline-variant rounded-none bg-transparent" type="checkbox"/>
+</li>
+<li class="flex justify-between items-center py-2 border-b border-dashed border-surface-variant">
+<span>Instagram</span>
+<input class="form-checkbox h-4 w-4 text-primary focus:ring-primary border-outline-variant rounded-none bg-transparent" type="checkbox"/>
+</li>
+<li class="flex justify-between items-center py-2 border-b border-dashed border-surface-variant">
+<span>TikTok</span>
+<input class="form-checkbox h-4 w-4 text-primary focus:ring-primary border-outline-variant rounded-none bg-transparent" type="checkbox"/>
+</li>
+<li class="flex justify-between items-center py-2 text-on-surface-variant hover:text-primary cursor-pointer transition-colors">
+<span class="italic">+ Dodaj własną aplikację</span>
+</li>
+</ul>
+</section>
+</div>
+<!-- Transactional Navigation (Bottom of Receipt) -->
+<div class="mt-2 p-container-padding flex flex-col gap-3 pb-6">
+<button class="w-full font-receipt-header text-receipt-header bg-primary text-on-primary py-3 rounded-none hover:bg-primary/90 transition-colors uppercase tracking-wider flex items-center justify-center gap-2">
+                    Zakończ
+                </button>
+<button class="w-full font-receipt-header text-receipt-header text-primary py-2 rounded-none hover:bg-surface-variant/30 transition-colors uppercase tracking-wider flex items-center justify-center gap-2">
+                    Wstecz
+                </button>
+</div>
+</div>
+</main>
+</body></html>

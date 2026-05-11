@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Onboarding 4 — Distraction Receipt</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      body { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+      .center { display:flex; align-items:center; justify-content:center; height:100vh; }
+    </style>
+  </head>
+  <body class="bg-gray-50">
+    <div class="center">
+      <div class="max-w-xl bg-white rounded-2xl p-8 shadow">
+        <h1 class="text-2xl font-bold mb-2">Gotowe!</h1>
+        <p class="text-gray-600 mb-4">To wszystko — twoje raporty będą dostępne w aplikacji.</p>
+        <div class="flex gap-3">
+          <a href="daily.html" class="px-4 py-2 bg-blue-600 text-white rounded">Zobacz raport</a>
+          <a href="onboarding-1.html" class="px-4 py-2 border rounded">Wróć</a>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+<!DOCTYPE html>
+
+<html lang="pl"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dołącz do Kolejki - Distraction Receipt</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&amp;family=Inter:wght@500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        @layer utilities {
+            .bg-mac-blur {
+                @apply bg-surface-variant/80 backdrop-blur-md;
+                box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.4);
+            }
+            .bg-receipt-paper {
+                @apply bg-background text-on-background;
+            }
+            .receipt-shadow {
+                box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+            }
+            .dashed-border-y {
+                border-top: 1px dashed var(--tw-prose-body, #c4c7c7); /* outline-variant */
+                border-bottom: 1px dashed var(--tw-prose-body, #c4c7c7);
+            }
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed": "#1d1b1a",
+                        "surface-container": "#f1edec",
+                        "on-primary-fixed": "#1b1c1c",
+                        "on-error": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "primary-fixed-dim": "#c8c6c6",
+                        "surface": "#fdf8f8",
+                        "secondary": "#5e5f5c",
+                        "primary-container": "#333333",
+                        "tertiary": "#201e1c",
+                        "on-surface-variant": "#444748",
+                        "primary": "#1e1e1e",
+                        "surface-tint": "#5f5e5e",
+                        "surface-container-lowest": "#ffffff",
+                        "inverse-primary": "#c8c6c6",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#1c1b1b",
+                        "tertiary-fixed": "#e7e1de",
+                        "surface-container-highest": "#e5e2e1",
+                        "on-secondary-fixed": "#1b1c1a",
+                        "tertiary-fixed-dim": "#cac6c2",
+                        "secondary-fixed-dim": "#c7c7c3",
+                        "outline": "#747878",
+                        "tertiary-container": "#353331",
+                        "inverse-on-surface": "#f4f0ef",
+                        "on-primary": "#ffffff",
+                        "surface-tint": "#5f5e5e",
+                        "on-tertiary-fixed-variant": "#494644",
+                        "surface": "#fdf8f8",
+                        "tertiary": "#201e1c",
+                        "on-secondary-fixed-variant": "#464744",
+                        "surface-bright": "#fdf8f8",
+                        "on-secondary": "#ffffff",
+                        "on-primary-fixed": "#1b1c1c",
+                        "outline": "#747878",
+                        "tertiary-fixed": "#e7e1de",
+                        "on-primary-container": "#9c9b9b",
+                        "on-tertiary-fixed": "#1d1b1a",
+                        "surface-container-high": "#ebe7e7",
+                        "tertiary-fixed-dim": "#cac6c2",
+                        "background": "#fdf8f8",
+                        "on-secondary-fixed": "#1b1c1a",
+                        "tertiary-container": "#353331",
+                        "surface-container-highest": "#e5e2e1",
+                        "on-background": "#1c1b1b",
+                        "on-tertiary": "#ffffff",
+                        "surface-dim": "#ddd9d8",
+                        "primary": "#1e1e1e",
+                        "tertiary": "#201e1c"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "container-padding": "12px",
+                        "receipt-margin": "8px",
+                        "element-gap": "16px",
+                        "unit": "4px",
+                        "item-padding-y": "6px"
+                    },
+                    "fontFamily": {
+                        "receipt-data": ["Courier Prime"],
+                        "receipt-body": ["Courier Prime"],
+                        "receipt-header": ["Courier Prime"],
+                        "nav-title": ["Inter"],
+                        "ui-label": ["Inter"]
+                    },
+                    "fontSize": {
+                        "receipt-data": ["11px", { "lineHeight": "14px", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+                        "receipt-body": ["12px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "receipt-header": ["16px", { "lineHeight": "20px", "fontWeight": "700" }],
+                        "nav-title": ["13px", { "lineHeight": "16px", "fontWeight": "600" }],
+                        "ui-label": ["11px", { "lineHeight": "12px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-mac-blur min-h-screen flex flex-col items-center justify-center p-4 antialiased text-on-surface">
+<!-- Main Receipt Container -->
+<main class="bg-receipt-paper w-full max-w-[360px] receipt-shadow flex flex-col relative overflow-hidden">
+<!-- Top App Bar (Semantic Shell - Suppressed for linear flow, keeping brand anchor styling loosely) -->
+<header class="w-full pt-[32px] pb-[16px] px-container-padding flex flex-col items-center">
+<span class="font-receipt-header text-receipt-header text-on-surface uppercase tracking-tighter mb-4">
+                KROK 4/4
+            </span>
+<div class="w-full border-b border-dashed border-outline-variant mb-element-gap"></div>
+<h1 class="font-receipt-header text-[20px] leading-[24px] font-bold text-center w-full uppercase mt-2">
+                DOŁĄCZ DO KOLEJKI
+            </h1>
+<p class="font-receipt-body text-receipt-body text-center mt-element-gap px-2 text-on-surface-variant">
+                Synchronizuj swoje streaki i rywalizuj ze znajomymi na najbardziej produktywne paragony.
+            </p>
+</header>
+<!-- Form Area -->
+<section class="flex flex-col w-full px-container-padding py-element-gap gap-element-gap">
+<form class="flex flex-col gap-[12px] w-full">
+<!-- Email Input -->
+<div class="w-full">
+<label class="sr-only font-ui-label text-ui-label" for="email">Email</label>
+<input class="w-full bg-transparent border-0 border-b border-dashed border-outline-variant rounded-none font-receipt-body text-receipt-body px-0 py-2 focus:ring-0 focus:border-primary placeholder:text-outline-variant" id="email" placeholder="adres@email.com" type="email"/>
+</div>
+<!-- Password Input -->
+<div class="w-full">
+<label class="sr-only font-ui-label text-ui-label" for="password">Hasło</label>
+<input class="w-full bg-transparent border-0 border-b border-dashed border-outline-variant rounded-none font-receipt-body text-receipt-body px-0 py-2 focus:ring-0 focus:border-primary placeholder:text-outline-variant" id="password" placeholder="Hasło" type="password"/>
+</div>
+<!-- Submit Button -->
+<button class="mt-[24px] w-full bg-primary text-on-primary font-receipt-header text-[14px] uppercase py-[12px] px-container-padding flex justify-center items-center gap-2 hover:bg-primary/90 transition-colors cursor-pointer" type="button">
+                    Zacznij drukować 
+                    <span class="font-sans text-[18px] font-normal leading-none">⎙</span>
+</button>
+</form>
+<!-- Login Link -->
+<div class="flex justify-center mt-2 w-full">
+<a class="font-receipt-data text-receipt-data text-secondary hover:text-primary underline decoration-dashed underline-offset-4" href="#">
+                    Zaloguj się zamiast tego
+                </a>
+</div>
+</section>
+<!-- Spacer to push footer down if needed, maintaining receipt length -->
+<div class="flex-grow min-h-[48px]"></div>
+<!-- Shared Component Footer -->
+<footer class="bg-surface-container-lowest flex flex-col items-center justify-center w-full gap-unit py-container-padding px-container-padding border-t border-dashed border-outline-variant shadow-sm relative z-10">
+<div class="font-receipt-header text-receipt-header text-on-surface uppercase tracking-tighter text-center">
+                DISTRACTION CO. LLC
+            </div>
+<div class="font-receipt-body text-receipt-body text-tertiary text-center">
+                DISTRACTION RECEIPT © 2024
+            </div>
+<div class="flex gap-4 mt-2">
+<button class="font-receipt-body text-receipt-body text-secondary hover:text-primary hover:bg-surface-dim/50 transition-colors cursor-pointer px-2 py-1 rounded">
+                    Save as Image
+                </button>
+<button class="font-receipt-body text-receipt-body text-secondary hover:text-primary hover:bg-surface-dim/50 transition-colors cursor-pointer px-2 py-1 rounded">
+                    Clear Session
+                </button>
+</div>
+</footer>
+</main>
+</body></html>

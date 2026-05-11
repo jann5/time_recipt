@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Onboarding 2 — Distraction Receipt</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      body { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+      .center { display:flex; align-items:center; justify-content:center; height:100vh; }
+    </style>
+  </head>
+  <body class="bg-gray-50">
+    <div class="center">
+      <div class="max-w-xl bg-white rounded-2xl p-8 shadow">
+        <h1 class="text-2xl font-bold mb-2">Jak to działa?</h1>
+        <p class="text-gray-600 mb-4">Aplikacja śledzi aktywność w aplikacjach i generuje raporty.</p>
+        <div class="flex gap-3">
+          <a href="onboarding-3.html" class="px-4 py-2 bg-blue-600 text-white rounded">Dalej</a>
+          <a href="daily.html" class="px-4 py-2 border rounded">Pomiń</a>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+<!DOCTYPE html>
+
+<html lang="pl"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Distraction Receipt - Onboarding Step 2</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&amp;family=Inter:wght@500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed": "#1d1b1a",
+                    "surface-container": "#f1edec",
+                    "on-primary-fixed": "#1b1c1c",
+                    "on-error": "#ffffff",
+                    "on-secondary": "#ffffff",
+                    "primary-fixed-dim": "#c8c6c6",
+                    "surface": "#fdf8f8",
+                    "secondary": "#5e5f5c",
+                    "primary-container": "#333333",
+                    "tertiary": "#201e1c",
+                    "on-surface-variant": "#444748",
+                    "primary": "#1e1e1e",
+                    "surface-tint": "#5f5e5e",
+                    "surface-container-lowest": "#ffffff",
+                    "inverse-primary": "#c8c6c6",
+                    "on-error-container": "#93000a",
+                    "on-surface": "#1c1b1b",
+                    "tertiary-fixed": "#e7e1de",
+                    "surface-container-highest": "#e5e2e1",
+                    "on-secondary-fixed": "#1b1c1a",
+                    "tertiary-fixed-dim": "#cac6c2",
+                    "secondary-fixed-dim": "#c7c7c3",
+                    "outline": "#747878",
+                    "tertiary-container": "#353331",
+                    "inverse-on-surface": "#f4f0ef",
+                    "surface-variant": "#e5e2e1",
+                    "secondary-fixed": "#e3e2df",
+                    "on-primary-fixed-variant": "#474747",
+                    "on-primary": "#ffffff",
+                    "background": "#fdf8f8",
+                    "surface-container-low": "#f7f3f2",
+                    "surface-bright": "#fdf8f8",
+                    "primary-fixed": "#e4e2e1",
+                    "on-secondary-container": "#626360",
+                    "on-primary-container": "#9c9b9b",
+                    "secondary-container": "#e0e0dc",
+                    "surface-dim": "#ddd9d8",
+                    "error": "#ba1a1a",
+                    "outline-variant": "#c4c7c7",
+                    "on-tertiary-fixed-variant": "#494644",
+                    "on-tertiary": "#ffffff",
+                    "error-container": "#ffdad6",
+                    "surface-container-high": "#ebe7e7",
+                    "inverse-surface": "#313030",
+                    "on-background": "#1c1b1b",
+                    "on-tertiary-container": "#9f9b98",
+                    "on-secondary-fixed-variant": "#464744"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "container-padding": "12px",
+                    "receipt-margin": "8px",
+                    "element-gap": "16px",
+                    "unit": "4px",
+                    "item-padding-y": "6px"
+            },
+            "fontFamily": {
+                    "receipt-data": [
+                            "Courier Prime"
+                    ],
+                    "receipt-body": [
+                            "Courier Prime"
+                    ],
+                    "receipt-header": [
+                            "Courier Prime"
+                    ],
+                    "nav-title": [
+                            "Inter"
+                    ],
+                    "ui-label": [
+                            "Inter"
+                    ]
+            },
+            "fontSize": {
+                    "receipt-data": [
+                            "11px",
+                            {
+                                    "lineHeight": "14px",
+                                    "letterSpacing": "-0.01em",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "receipt-body": [
+                            "12px",
+                            {
+                                    "lineHeight": "18px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "receipt-header": [
+                            "16px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "nav-title": [
+                            "13px",
+                            {
+                                    "lineHeight": "16px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "ui-label": [
+                            "11px",
+                            {
+                                    "lineHeight": "12px",
+                                    "fontWeight": "500"
+                            }
+                    ]
+            }
+          },
+        },
+      }
+    </script>
+</head>
+<body class="bg-background min-h-screen flex items-center justify-center p-4">
+<!-- The Glass Shell -->
+<div class="relative w-full max-w-[360px] h-[640px] rounded-xl overflow-hidden shadow-2xl bg-surface-container-highest/60 backdrop-blur-xl border-[0.5px] border-white/20 flex flex-col">
+<!-- Content Canvas -->
+<main class="flex-1 overflow-y-auto hidden-scrollbar flex flex-col items-center justify-between py-12 px-8 bg-surface relative">
+<!-- Content Wrapper -->
+<div class="flex flex-col items-center w-full mt-4">
+<!-- Step Indicator -->
+<h2 class="font-receipt-header text-receipt-header text-on-surface mb-8 tracking-tighter uppercase">KROK 2/4</h2>
+<!-- Title -->
+<h1 class="font-receipt-header text-[20px] leading-[24px] font-bold text-on-surface mb-6 text-center uppercase">JAK TO DZIAŁA?</h1>
+<!-- Graphic -->
+<div class="mb-10 flex items-center justify-center">
+<svg class="text-primary" fill="none" height="80" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewbox="0 0 24 24" width="80" xmlns="http://www.w3.org/2000/svg">
+<rect height="14" rx="2" ry="2" width="20" x="2" y="3"></rect>
+<line x1="8" x2="16" y1="21" y2="21"></line>
+<line x1="12" x2="12" y1="17" y2="21"></line>
+<path d="M12 6l-3 1.5v3c0 2.5 1.5 4.5 3 5.5 1.5-1 3-3 3-5.5v-3L12 6z"></path>
+</svg>
+</div>
+<!-- Body Text -->
+<p class="font-receipt-body text-receipt-body text-on-surface-variant text-center max-w-[280px]">
+                    Cicho obserwujemy aktywne okno co 5 sekund. Wszystko zostaje u Ciebie - zero chmury, zero AI, czysta prywatność.
+                </p>
+</div>
+<!-- Action Button -->
+<div class="w-full mt-12 mb-4 flex justify-center">
+<button class="w-full bg-primary text-on-primary font-receipt-header text-receipt-header py-4 px-6 uppercase tracking-wider flex items-center justify-center hover:bg-primary/90 transition-colors rounded-none">
+                    PRZYZNAJ UPRAWNIENIA MACOS -&gt;
+                </button>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-lowest dark:bg-surface-container-lowest border-t border-dashed border-outline-variant shadow-sm flex flex-col items-center justify-center w-full gap-unit py-container-padding px-container-padding z-10 relative">
+<div class="font-receipt-header text-receipt-header text-on-surface uppercase tracking-tighter text-center w-full">DISTRACTION RECEIPT © 2024</div>
+<div class="flex gap-4 mt-2">
+<span class="text-secondary hover:text-primary hover:bg-surface-dim/50 transition-colors cursor-pointer font-receipt-body text-receipt-body">Save as Image</span>
+<span class="text-secondary hover:text-primary hover:bg-surface-dim/50 transition-colors cursor-pointer font-receipt-body text-receipt-body">Clear Session</span>
+</div>
+</footer>
+</div>
+</body></html>

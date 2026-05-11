@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Welcome - Distraction Co. LLC</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary": "#ffffff",
+                        "background": "#fdf8f8",
+                        "on-primary-fixed-variant": "#474747",
+                        "on-secondary-fixed": "#1b1c1a",
+                        "primary": "#1e1e1e",
+                        "on-surface": "#1c1b1b",
+                        "on-primary-container": "#9c9b9b",
+                        "secondary-fixed": "#e3e2df",
+                        "surface-container-highest": "#e5e2e1",
+                        "on-background": "#1c1b1b",
+                        "inverse-primary": "#c8c6c6",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f7f3f2",
+                        "on-primary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-error": "#ffffff",
+                        "secondary-container": "#e0e0dc",
+                        "on-surface-variant": "#444748",
+                        "outline-variant": "#c4c7c7",
+                        "on-secondary-fixed-variant": "#464744",
+                        "primary-fixed-dim": "#c8c6c6",
+                        "on-primary-fixed": "#1b1c1c",
+                        "outline": "#747878",
+                        "on-tertiary-fixed": "#1d1b1a",
+                        "secondary": "#5e5f5c",
+                        "surface": "#fdf8f8",
+                        "on-tertiary-container": "#9f9b98",
+                        "error": "#ba1a1a",
+                        "inverse-on-surface": "#f4f0ef",
+                        "on-tertiary": "#ffffff",
+                        "surface-bright": "#fdf8f8",
+                        "primary-container": "#333333",
+                        "inverse-surface": "#313030",
+                        "tertiary-container": "#353331",
+                        "tertiary": "#201e1c",
+                        "surface-tint": "#5f5e5e",
+                        "on-secondary-container": "#626360",
+                        "surface-container-high": "#ebe7e7",
+                        "surface-variant": "#e5e2e1",
+                        "secondary-fixed-dim": "#c7c7c3",
+                        "surface-dim": "#ddd9d8",
+                        "tertiary-fixed": "#e7e1de",
+                        "tertiary-fixed-dim": "#cac6c2",
+                        "primary-fixed": "#e4e2e1",
+                        "on-tertiary-fixed-variant": "#494644",
+                        "error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "element-gap": "16px",
+                        "container-padding": "12px",
+                        "receipt-margin": "8px",
+                        "item-padding-y": "6px"
+                    },
+                    "fontFamily": {
+                        "receipt-data": ["Courier Prime"],
+                        "receipt-body": ["Courier Prime"],
+                        "receipt-header": ["Courier Prime"],
+                        "ui-label": ["Inter"],
+                        "nav-title": ["Inter"]
+                    },
+                    "fontSize": {
+                        "receipt-data": ["11px", { "lineHeight": "14px", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+                        "receipt-body": ["12px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "receipt-header": ["16px", { "lineHeight": "20px", "fontWeight": "700" }],
+                        "ui-label": ["11px", { "lineHeight": "12px", "fontWeight": "500" }],
+                        "nav-title": ["13px", { "lineHeight": "16px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        .receipt-paper {
+            background-color: #F9F8F4;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .receipt-bottom-edge {
+            position: relative;
+        }
+    </style>
+</head>
+<body class="bg-surface-variant min-h-screen flex items-center justify-center p-4 antialiased overflow-hidden">
+<!-- Background blur overlay for macOS effect -->
+<div class="absolute inset-0 bg-surface-variant/80 backdrop-blur-3xl z-0"></div>
+<!-- Main Content Container (macOS Popover Shell Width) -->
+<div class="relative z-10 w-full max-w-[360px] flex flex-col h-[600px] max-h-[921px]">
+<!-- Receipt Canvas -->
+<main class="flex-grow receipt-paper flex flex-col relative w-[90%] mx-auto z-20">
+<!-- Content Area -->
+<div class="flex-grow flex flex-col justify-between p-6">
+<!-- Top Section -->
+<div class="flex flex-col items-center pt-8">
+<div class="font-receipt-header text-receipt-header text-on-surface mb-12 tracking-widest uppercase">
+                        KROK 1/4
+                    </div>
+<h1 class="font-receipt-header text-receipt-header text-on-surface uppercase text-center mb-10 leading-relaxed max-w-[200px]">
+                        WITAJ W DISTRACTION CO.
+                    </h1>
+<div class="mb-10 text-primary">
+<span class="material-symbols-outlined text-[64px] font-light" style="font-variation-settings: 'wght' 200;">
+                            receipt_long
+                        </span>
+</div>
+<p class="font-receipt-body text-receipt-body text-on-surface text-center max-w-[220px]">
+                        Dlaczego paragon? Bo wykresy nie bolą tak, jak wydany czas.
+                    </p>
+</div>
+<!-- Bottom Action -->
+<div class="flex flex-col items-center pb-8 w-full">
+<button class="w-full bg-primary text-on-primary font-receipt-header text-receipt-header py-4 uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-primary-container transition-colors">
+                        Dalej <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Clean Bottom Edge (No jagged mask as requested) -->
+<div class="h-2 bg-surface-container-lowest w-full absolute bottom-[-8px] opacity-0"></div>
+</main>
+<!-- Subtle shadow under receipt -->
+<div class="absolute inset-0 bg-black/5 -z-10 blur-xl w-[95%] mx-auto mt-4 rounded-xl"></div>
+</div>
+</body></html>
