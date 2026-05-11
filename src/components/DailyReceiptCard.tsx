@@ -651,3 +651,6 @@ export default function DailyReceiptCard({
     </div>
   )
 }
+
+
+    
