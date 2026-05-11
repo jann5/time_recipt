@@ -123,7 +123,7 @@ export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
               marginBottom: 18,
             }}
           >
-            KROK 2/4
+            KROK 2/3
           </div>
 
           <h1
@@ -172,7 +172,9 @@ export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
               color: '#1c1b1b',
             }}
           >
-            Pokazujemy, jak wykorzystujesz czas w aplikacjach i przeglądarce. Dane zostają lokalnie na Twoim Macu.
+            Pokazujemy, jak wykorzystujesz czas w aplikacjach i przeglądarce.
+            <br />
+            Twoje dane zostają lokalnie na Twoim Macu — nikt poza Tobą nie ma do nich wglądu.
           </p>
         </div>
 

@@ -1,12 +1,42 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 
 interface Onboarding3CardProps {
   onNext?: () => void
 }
 
+interface BrowserRule {
+  pattern: string
+  label: string
+  category: 'productive' | 'distraction'
+  browsers: string[]
+}
+
+interface UserSettings {
+  distraction_apps: string[]
+  work_apps: string[]
+  browser_rules: BrowserRule[]
+  daily_report_time: string
+  notifications_enabled: boolean
+}
+
+function parseTime(value: string): { hour: number; minute: number } | null {
+  const match = value.match(/^([01]\d|2[0-3]):([0-5]\d)$/)
+  if (!match) {
+    return null
+  }
+
+  return {
+    hour: Number(match[1]),
+    minute: Number(match[2]),
+  }
+}
+
 export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
   const [hour, setHour] = useState(22)
   const [minute, setMinute] = useState(0)
+  const [saveError, setSaveError] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
   const [distractions, setDistractions] = useState<Record<string, boolean>>(() => {
     // Load saved distractions from localStorage
     const saved = localStorage.getItem('distractions')
@@ -30,6 +60,29 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
     }
   })
 
+  useEffect(() => {
+    let disposed = false
+
+    const loadSavedSettings = async () => {
+      try {
+        const settings = await invoke<UserSettings>('get_settings')
+        const parsedTime = parseTime(settings.daily_report_time)
+        if (!disposed && parsedTime) {
+          setHour(parsedTime.hour)
+          setMinute(parsedTime.minute)
+        }
+      } catch (error) {
+        console.error('Nie udało się wczytać ustawień onboarding:', error)
+      }
+    }
+
+    void loadSavedSettings()
+
+    return () => {
+      disposed = true
+    }
+  }, [])
+
   // Save to localStorage whenever distractions change
   const updateDistractions = (newDistractions: Record<string, boolean>) => {
     setDistractions(newDistractions)
@@ -46,6 +99,35 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
   const decrementHour = () => setHour(h => (h - 1 + 24) % 24)
   const incrementMinute = () => setMinute(m => (m + 1) % 60)
   const decrementMinute = () => setMinute(m => (m - 1 + 60) % 60)
+
+  const handleNext = async () => {
+    setIsSaving(true)
+    setSaveError('')
+
+    try {
+      const settings = await invoke<UserSettings>('get_settings')
+      const dailyReportTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+      const selectedDistractions = Object.entries(distractions)
+        .filter(([, enabled]) => enabled)
+        .map(([name]) => name.trim())
+        .filter((name) => name.length > 0)
+
+      await invoke('update_settings', {
+        newSettings: {
+          ...settings,
+          daily_report_time: dailyReportTime,
+          distraction_apps: selectedDistractions,
+        },
+      })
+
+      onNext && onNext()
+    } catch (error) {
+      console.error('Nie udało się zapisać ustawień onboarding:', error)
+      setSaveError('Nie udało się zapisać ustawień. Spróbuj ponownie.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   return (
     <div className="h-full w-full">
@@ -83,7 +165,7 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
               marginBottom: 18,
             }}
           >
-            KROK 3/4
+            KROK 3/3
           </div>
 
           <h1
@@ -107,6 +189,8 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
             }}
           >
             Ty decydujesz, co jest rozproszeniem.
+            <br />
+            Dane zostają lokalnie — tylko Ty masz do nich dostęp.
           </p>
           
           {/* Dashed line separator */}
@@ -315,8 +399,22 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
 
         {/* Button */}
         <div style={{ marginTop: 'auto', paddingTop: 24 }}>
+          {saveError && (
+            <div
+              style={{
+                fontSize: 10,
+                color: '#8a3c3c',
+                marginBottom: 12,
+                textAlign: 'center',
+              }}
+            >
+              {saveError}
+            </div>
+          )}
+
           <button
-            onClick={() => onNext && onNext()}
+            onClick={() => void handleNext()}
+            disabled={isSaving}
             style={{
               background: '#1e1e1e',
               color: '#fff',
@@ -328,10 +426,11 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
               border: 'none',
-              cursor: 'pointer',
+              cursor: isSaving ? 'default' : 'pointer',
+              opacity: isSaving ? 0.85 : 1,
             }}
           >
-            ZAKOŃCZ
+            {isSaving ? 'ZAPISYWANIE...' : 'ZACZNIJ'}
           </button>
         </div>
       </div>

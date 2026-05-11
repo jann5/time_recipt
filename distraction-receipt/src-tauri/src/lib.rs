@@ -1,4 +1,5 @@
-use chrono::{Datelike, Duration as ChronoDuration, Local, NaiveDate};
+use base64::{engine::general_purpose, Engine as _};
+use chrono::{Datelike, Duration as ChronoDuration, Local, NaiveDate, Timelike};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -9,12 +10,11 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::window::Window;
 use tauri::{Emitter, LogicalSize, Manager, State};
 use tokio::sync::Mutex;
 use url::Url;
 
-const MIN_REPORT_ENTRY_SECONDS: u64 = 10 * 60;
+const MIN_REPORT_ENTRY_SECONDS: u64 = 5 * 60;
 
 #[cfg(target_os = "macos")]
 use core_foundation_sys::base::{kCFAllocatorDefault, CFRelease};
@@ -240,9 +240,9 @@ impl AppState {
         let data_dir = Self::get_data_dir();
         let _ = fs::create_dir_all(&data_dir);
 
-        let today = today_key();
-        let stats = Self::load_daily_stats(&data_dir, &today);
         let settings = Self::load_settings(&data_dir);
+        let active_day = active_receipt_day_key(&settings);
+        let stats = Self::load_daily_stats(&data_dir, &active_day);
 
         Self {
             current_activity: Arc::new(Mutex::new(None)),
@@ -311,11 +311,12 @@ impl AppState {
         Self::write_json_atomic(&path, &settings)
     }
 
-    pub async fn ensure_current_day(&self) -> Result<(), String> {
-        let today = today_key();
+    pub async fn ensure_current_day(&self) -> Result<Option<String>, String> {
+        let settings = self.settings.lock().await.clone();
+        let today = active_receipt_day_key(&settings);
         let current_snapshot = self.daily_stats.lock().await.clone();
         if current_snapshot.date == today {
-            return Ok(());
+            return Ok(None);
         }
 
         self.write_stats_snapshot(&current_snapshot)?;
@@ -343,7 +344,8 @@ impl AppState {
             };
         }
 
-        self.save_daily_stats().await
+        self.save_daily_stats().await?;
+        Ok(Some(current_snapshot.date))
     }
 
     fn read_daily_stats_files(&self) -> Vec<DailyStats> {
@@ -480,7 +482,8 @@ async fn get_daily_report_for_date(
 
     state.ensure_current_day().await?;
 
-    let stats = if date_key == today_key() {
+    let current_date = state.daily_stats.lock().await.date.clone();
+    let stats = if date_key == current_date {
         flush_current_activity_elapsed(&state).await?;
         state.save_daily_stats().await?;
         state.daily_stats.lock().await.clone()
@@ -504,7 +507,7 @@ async fn get_browser_insights(state: State<'_, AppState>) -> Result<BrowserInsig
     state.save_daily_stats().await?;
 
     let settings = state.settings.lock().await.clone();
-    let today = today_key();
+    let today = state.daily_stats.lock().await.date.clone();
     let cutoff_date = Local::now().date_naive() - ChronoDuration::days(30);
 
     let all_stats = state.read_daily_stats_files();
@@ -590,7 +593,7 @@ async fn get_app_insights(state: State<'_, AppState>) -> Result<AppInsights, Str
     state.save_daily_stats().await?;
 
     let settings = state.settings.lock().await.clone();
-    let today = today_key();
+    let today = state.daily_stats.lock().await.date.clone();
     let cutoff_date = Local::now().date_naive() - ChronoDuration::days(30);
 
     let all_stats = state.read_daily_stats_files();
@@ -731,7 +734,8 @@ async fn get_weekly_history(state: State<'_, AppState>) -> Result<WeeklyHistory,
 
     let settings = state.settings.lock().await.clone();
     let all_stats = state.read_daily_stats_files();
-    let today = Local::now().date_naive();
+    let today = NaiveDate::parse_from_str(&state.daily_stats.lock().await.date, "%Y-%m-%d")
+        .unwrap_or_else(|_| Local::now().date_naive());
     let week_start = today - ChronoDuration::days(today.weekday().num_days_from_monday() as i64);
     let week_end = week_start + ChronoDuration::days(6);
 
@@ -805,7 +809,7 @@ async fn mark_day_off(date: String, state: State<'_, AppState>) -> Result<(), St
 
     state.ensure_current_day().await?;
 
-    let today = today_key();
+    let today = state.daily_stats.lock().await.date.clone();
     if date_key == today {
         {
             let mut stats = state.daily_stats.lock().await;
@@ -830,28 +834,33 @@ async fn mark_day_off(date: String, state: State<'_, AppState>) -> Result<(), St
 
 #[tauri::command]
 async fn save_receipt_as_image(
-    _window: Window,
+    image_data_url: String,
+    date: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    use std::process::Command;
-
     state.ensure_current_day().await?;
-    let date = state.daily_stats.lock().await.date.clone();
 
-    let screenshots_dir = state.data_dir.join("screenshots");
-    fs::create_dir_all(&screenshots_dir).map_err(|e| e.to_string())?;
+    let fallback_date = state.daily_stats.lock().await.date.clone();
+    let target_date = date
+        .as_deref()
+        .and_then(|value| NaiveDate::parse_from_str(value, "%Y-%m-%d").ok())
+        .map(|parsed| parsed.format("%Y-%m-%d").to_string())
+        .unwrap_or(fallback_date);
 
-    let filename = format!("receipt_{date}.png");
-    let filepath = screenshots_dir.join(&filename);
+    let base64_payload = image_data_url
+        .trim()
+        .strip_prefix("data:image/png;base64,")
+        .ok_or_else(|| "image_data_url must be a data:image/png;base64 payload".to_string())?;
+    let image_bytes = general_purpose::STANDARD
+        .decode(base64_payload)
+        .map_err(|error| format!("invalid base64 image payload: {error}"))?;
 
-    let output = Command::new("screencapture")
-        .args(["-w", filepath.to_str().ok_or("invalid screenshot path")?])
-        .output()
-        .map_err(|e| e.to_string())?;
+    let receipts_dir = state.data_dir.join("receipts");
+    fs::create_dir_all(&receipts_dir).map_err(|e| e.to_string())?;
 
-    if !output.status.success() {
-        return Err("Failed to capture screenshot".to_string());
-    }
+    let filename = format!("receipt_{target_date}.png");
+    let filepath = receipts_dir.join(&filename);
+    fs::write(&filepath, image_bytes).map_err(|e| e.to_string())?;
 
     Ok(filepath.to_string_lossy().to_string())
 }
@@ -1107,8 +1116,12 @@ async fn tracking_loop(state: Arc<AppState>, app_handle: tauri::AppHandle) {
     loop {
         interval.tick().await;
 
-        if state.ensure_current_day().await.is_err() {
-            continue;
+        let switched_from_date = match state.ensure_current_day().await {
+            Ok(switched_from_date) => switched_from_date,
+            Err(_) => continue,
+        };
+        if let Some(previous_date) = switched_from_date {
+            let _ = app_handle.emit("daily-report-ready", previous_date);
         }
 
         let Some(active_window) = get_active_window() else {
@@ -1164,8 +1177,33 @@ async fn tracking_loop(state: Arc<AppState>, app_handle: tauri::AppHandle) {
     }
 }
 
-fn today_key() -> String {
-    Local::now().format("%Y-%m-%d").to_string()
+fn active_receipt_day_key(settings: &UserSettings) -> String {
+    let now = Local::now();
+    let (report_hour, report_minute) = parse_report_time(&settings.daily_report_time);
+    let today = now.date_naive();
+    let shifted_day = if now.hour() > report_hour as u32
+        || (now.hour() == report_hour as u32 && now.minute() >= report_minute as u32)
+    {
+        today + ChronoDuration::days(1)
+    } else {
+        today
+    };
+
+    shifted_day.format("%Y-%m-%d").to_string()
+}
+
+fn parse_report_time(value: &str) -> (u8, u8) {
+    let parts: Vec<&str> = value.split(':').collect();
+    if parts.len() != 2 {
+        return (22, 0);
+    }
+
+    let hour = parts[0].parse::<u8>().ok();
+    let minute = parts[1].parse::<u8>().ok();
+    match (hour, minute) {
+        (Some(h), Some(m)) if h < 24 && m < 60 => (h, m),
+        _ => (22, 0),
+    }
 }
 
 fn build_activity_context(window: &ActiveWindow, settings: &UserSettings) -> ActivityContext {

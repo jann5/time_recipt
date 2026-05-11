@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import html2canvas from 'html2canvas'
 
 interface AppUsage {
   name: string
@@ -22,6 +23,8 @@ interface DailyReport {
 interface DailyReceiptCardProps {
   onNavigate?: (screen: 'weekly' | 'settings' | 'daily') => void
   reportDate?: string
+  readyForConfirmationDate?: string
+  onConfirmReadyReceipt?: () => void
 }
 
 function formatTime(seconds: number): string {
@@ -52,9 +55,23 @@ function HistoryIcon() {
   )
 }
 
-export default function DailyReceiptCard({ onNavigate, reportDate }: DailyReceiptCardProps) {
+export default function DailyReceiptCard({
+  onNavigate,
+  reportDate,
+  readyForConfirmationDate,
+  onConfirmReadyReceipt,
+}: DailyReceiptCardProps) {
+  const receiptCaptureRef = useRef<HTMLDivElement | null>(null)
   const [report, setReport] = useState<DailyReport | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isSavingReceiptImage, setIsSavingReceiptImage] = useState(false)
+  const [readyReceiptError, setReadyReceiptError] = useState('')
+  const isHistoricalReport = Boolean(reportDate)
+  const isReadyForConfirmation = Boolean(
+    reportDate
+      && readyForConfirmationDate
+      && reportDate === readyForConfirmationDate,
+  )
 
   useEffect(() => {
     let disposed = false
@@ -104,16 +121,83 @@ export default function DailyReceiptCard({ onNavigate, reportDate }: DailyReceip
     }
   }, [reportDate])
 
-  const handleSaveImage = async () => {
+  const captureReceiptAsPngDataUrl = async (): Promise<string> => {
+    const receiptElement = receiptCaptureRef.current
+    if (!receiptElement) {
+      throw new Error('Receipt root not found')
+    }
+
+    const captureWidth = Math.max(receiptElement.scrollWidth, receiptElement.clientWidth, 390)
+    const captureHeight = Math.max(receiptElement.scrollHeight, receiptElement.clientHeight, 860)
+    const canvas = await html2canvas(receiptElement, {
+      backgroundColor: '#fbfaf5',
+      scale: 2,
+      useCORS: true,
+      width: captureWidth,
+      height: captureHeight,
+      windowWidth: captureWidth,
+      windowHeight: captureHeight,
+      scrollX: 0,
+      scrollY: 0,
+      onclone: (documentClone) => {
+        const clonedRoot = documentClone.querySelector<HTMLElement>('[data-receipt-capture-root="true"]')
+        if (!clonedRoot) {
+          return
+        }
+        clonedRoot.style.height = 'auto'
+        clonedRoot.style.minHeight = '0'
+        clonedRoot.style.maxHeight = 'none'
+        clonedRoot.style.overflow = 'visible'
+      },
+    })
+
+    return canvas.toDataURL('image/png')
+  }
+
+  const handleSaveImage = async (showAlerts = true): Promise<boolean> => {
+    setIsSavingReceiptImage(true)
+    if (!showAlerts) {
+      setReadyReceiptError('')
+    }
+
     try {
-      const path = await invoke<string>('save_receipt_as_image')
+      const imageDataUrl = await captureReceiptAsPngDataUrl()
+      const path = await invoke<string>('save_receipt_as_image', {
+        imageDataUrl,
+        date: report?.date ?? reportDate ?? undefined,
+      })
       console.log('Zapisano obraz:', path)
-      alert('Paragon zapisany!')
+      if (showAlerts) {
+        alert('Paragon zapisany!')
+      }
+      return true
     } catch (error) {
       console.error('Błąd zapisywania:', error)
-      alert('Błąd podczas zapisywania')
+      if (showAlerts) {
+        alert('Błąd podczas zapisywania')
+      } else {
+        setReadyReceiptError('Nie udało się zapisać obrazu. Spróbuj ponownie.')
+      }
+      return false
+    } finally {
+      setIsSavingReceiptImage(false)
     }
   }
+
+  const handleConfirmReadyReceipt = () => {
+    if (!isReadyForConfirmation || !onConfirmReadyReceipt || isSavingReceiptImage) {
+      return
+    }
+    setReadyReceiptError('')
+    onConfirmReadyReceipt()
+  }
+
+  useEffect(() => {
+    if (!isReadyForConfirmation) {
+      setReadyReceiptError('')
+      setIsSavingReceiptImage(false)
+    }
+  }, [isReadyForConfirmation])
 
   const productiveApps = report?.productive_apps ?? []
   const distractionApps = report?.distraction_apps ?? []
@@ -151,6 +235,8 @@ export default function DailyReceiptCard({ onNavigate, reportDate }: DailyReceip
       <div
         role="dialog"
         aria-label="Daily receipt"
+        ref={receiptCaptureRef}
+        data-receipt-capture-root="true"
         className="flex-shrink-0 h-full w-full"
         style={{
           width: '100%',
@@ -251,6 +337,115 @@ export default function DailyReceiptCard({ onNavigate, reportDate }: DailyReceip
             {today} · {report?.daily_report_time || '22:00'}
           </div>
         </div>
+
+        {isHistoricalReport && (
+          <div
+            style={{
+              border: '1px dashed #c4c4c4',
+              padding: '10px 12px',
+              marginBottom: 22,
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: '0.16em',
+                marginBottom: 8,
+                textTransform: 'uppercase',
+              }}
+            >
+              STARY PARAGON
+            </div>
+            <div
+              style={{
+                fontSize: 10,
+                color: '#666',
+                fontStyle: 'italic',
+                marginBottom: 8,
+                letterSpacing: '0.03em',
+              }}
+            >
+              {isReadyForConfirmation
+                ? 'Paragon jest gotowy do zamknięcia. Zapis obrazu jest opcjonalny.'
+                : 'To archiwalny raport. Dzisiejszy paragon nadal się tworzy.'}
+            </div>
+            {isReadyForConfirmation ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                <button
+                  onClick={handleConfirmReadyReceipt}
+                  disabled={isSavingReceiptImage}
+                  style={{
+                    background: '#1e1e1e',
+                    border: 'none',
+                    color: '#fff',
+                    cursor: isSavingReceiptImage ? 'default' : 'pointer',
+                    fontFamily: 'Courier Prime, monospace',
+                    fontSize: 10,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    padding: '10px 14px',
+                    borderRadius: 2,
+                    opacity: isSavingReceiptImage ? 0.85 : 1,
+                  }}
+                >
+                  ZATWIERDŹ I PRZEJDŹ DALEJ
+                </button>
+                <button
+                  onClick={() => {
+                    void handleSaveImage(false)
+                  }}
+                  disabled={isSavingReceiptImage}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#1c1b1b',
+                    cursor: isSavingReceiptImage ? 'default' : 'pointer',
+                    fontFamily: 'Courier Prime, monospace',
+                    fontSize: 10,
+                    letterSpacing: '0.1em',
+                    textDecoration: 'underline',
+                    textUnderlineOffset: '3px',
+                    padding: 0,
+                    opacity: isSavingReceiptImage ? 0.6 : 0.85,
+                  }}
+                >
+                  {isSavingReceiptImage ? 'ZAPISYWANIE OBRAZU...' : 'ZAPISZ JAKO OBRAZ (OPCJONALNIE)'}
+                </button>
+                {readyReceiptError && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      fontSize: 10,
+                      color: '#8a3c3c',
+                    }}
+                  >
+                    {readyReceiptError}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={() => onNavigate && onNavigate('daily')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#1c1b1b',
+                  cursor: 'pointer',
+                  fontFamily: 'Courier Prime, monospace',
+                  fontSize: 10,
+                  letterSpacing: '0.1em',
+                  textDecoration: 'underline',
+                  textUnderlineOffset: '3px',
+                  padding: 0,
+                }}
+              >
+                Wróć do dzisiejszego paragonu
+              </button>
+            )}
+          </div>
+        )}
 
         <div style={{ borderTop: '1px dashed #c4c4c4', marginBottom: 24 }} />
 
@@ -424,7 +619,9 @@ export default function DailyReceiptCard({ onNavigate, reportDate }: DailyReceip
 
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <button
-              onClick={handleSaveImage}
+              onClick={() => {
+                void handleSaveImage()
+              }}
               style={{
                 background: 'none',
                 border: 'none',

@@ -5,12 +5,11 @@ import { currentMonitor, getCurrentWindow, LogicalSize } from '@tauri-apps/api/w
 import Onboarding1 from './screens/Onboarding1'
 import Onboarding2 from './screens/Onboarding2'
 import Onboarding3 from './screens/Onboarding3'
-import Onboarding4 from './screens/Onboarding4'
 import DailyReceipt from './screens/DailyReceipt'
 import WeeklyReceipt from './screens/WeeklyReceipt'
 import Settings from './screens/Settings'
 
-type Screen = 'onboarding1' | 'onboarding2' | 'onboarding3' | 'onboarding4' | 'daily' | 'weekly' | 'settings'
+type Screen = 'onboarding1' | 'onboarding2' | 'onboarding3' | 'daily' | 'weekly' | 'settings'
 
 type ScreenWindowPreset = {
   width: number
@@ -23,7 +22,6 @@ const screenWindowPresets: Record<Screen, ScreenWindowPreset> = {
   onboarding1: { width: 330, height: 680 },
   onboarding2: { width: 340, height: 760 },
   onboarding3: { width: 350, height: 860 },
-  onboarding4: { width: 340, height: 740 },
   daily: { width: 390, height: 860 },
   weekly: { width: 380, height: 780 },
   settings: { width: 390, height: 880 },
@@ -58,6 +56,9 @@ export default function App() {
     localStorage.getItem(ONBOARDING_COMPLETED_KEY) === 'true' ? 'daily' : 'onboarding1',
   )
   const [selectedHistoryDate, setSelectedHistoryDate] = useState<string | null>(null)
+  const [readyReceiptDate, setReadyReceiptDate] = useState<string | null>(null)
+  const [readyReceiptToConfirm, setReadyReceiptToConfirm] = useState<string | null>(null)
+  const [reportReadyOverlayOpen, setReportReadyOverlayOpen] = useState(false)
   const [betaOpen, setBetaOpen] = useState(false)
   const [betaStats, setBetaStats] = useState<DebugDailyStats | null>(null)
   const [betaProbe, setBetaProbe] = useState<DebugTrackingProbe | null>(null)
@@ -81,12 +82,50 @@ export default function App() {
     handleNavigate('daily')
   }
 
+  const handleOpenReadyReceipt = () => {
+    if (!readyReceiptDate) {
+      return
+    }
+
+    setSelectedHistoryDate(readyReceiptDate)
+    setCurrentScreen('daily')
+    setReportReadyOverlayOpen(false)
+  }
+
+  const handleConfirmReadyReceipt = () => {
+    setSelectedHistoryDate(null)
+    setReadyReceiptDate(null)
+    setReadyReceiptToConfirm(null)
+    setCurrentScreen('daily')
+  }
+
   useEffect(() => {
     const unlistenPromise = listen<string>('navigate-to', (event) => {
       const nextScreen = event.payload
       if (nextScreen === 'daily' || nextScreen === 'weekly' || nextScreen === 'settings') {
         setCurrentScreen(nextScreen)
       }
+    })
+
+    return () => {
+      void unlistenPromise.then((unlisten) => {
+        unlisten()
+      })
+    }
+  }, [])
+
+  useEffect(() => {
+    const unlistenPromise = listen<string>('daily-report-ready', (event) => {
+      const reportDate = event.payload
+      if (!reportDate) {
+        return
+      }
+
+      setReadyReceiptDate(reportDate)
+      setReadyReceiptToConfirm(reportDate)
+      setReportReadyOverlayOpen(true)
+      setSelectedHistoryDate(null)
+      setCurrentScreen('daily')
     })
 
     return () => {
@@ -205,12 +244,90 @@ export default function App() {
       <div className="relative z-10 w-full h-full">
         {currentScreen === 'onboarding1' && <Onboarding1 onNext={() => handleNavigate('onboarding2')} />}
         {currentScreen === 'onboarding2' && <Onboarding2 onNext={() => handleNavigate('onboarding3')} />}
-        {currentScreen === 'onboarding3' && <Onboarding3 onNext={() => handleNavigate('onboarding4')} />}
-        {currentScreen === 'onboarding4' && <Onboarding4 onFinish={handleCompleteOnboarding} onBack={() => handleNavigate('onboarding3')} />}
-        {currentScreen === 'daily' && <DailyReceipt onNavigate={handleNavigate} reportDate={selectedHistoryDate ?? undefined} />}
+        {currentScreen === 'onboarding3' && <Onboarding3 onNext={handleCompleteOnboarding} />}
+        {currentScreen === 'daily' && (
+          <DailyReceipt
+            onNavigate={handleNavigate}
+            reportDate={selectedHistoryDate ?? undefined}
+            readyForConfirmationDate={readyReceiptToConfirm ?? undefined}
+            onConfirmReadyReceipt={handleConfirmReadyReceipt}
+          />
+        )}
         {currentScreen === 'weekly' && <WeeklyReceipt onNavigate={handleNavigate} onOpenDayReceipt={handleOpenHistoryDay} />}
         {currentScreen === 'settings' && <Settings onNavigate={handleNavigate} />}
       </div>
+
+      {reportReadyOverlayOpen && !isOnboardingScreen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 120,
+            background: 'rgba(20, 20, 20, 0.42)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 320,
+              background: '#fbfaf5',
+              border: '1px dashed #c4c4c4',
+              borderRadius: 4,
+              padding: '22px 18px',
+              textAlign: 'center',
+              color: '#1c1b1b',
+              fontFamily: 'Courier Prime, monospace',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                marginBottom: 10,
+              }}
+            >
+              TWÓJ PARAGON JEST GOTOWY
+            </div>
+            <div
+              style={{
+                fontSize: 10,
+                color: '#666',
+                fontStyle: 'italic',
+                marginBottom: 16,
+                letterSpacing: '0.03em',
+              }}
+            >
+              Kliknij poniżej, aby obejrzeć raport i zamknąć dzień.
+            </div>
+            <button
+              onClick={handleOpenReadyReceipt}
+              style={{
+                background: '#1e1e1e',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 2,
+                padding: '12px 16px',
+                width: '100%',
+                fontFamily: 'Courier Prime, monospace',
+                fontSize: 11,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+              }}
+            >
+              OBEJRZYJ PARAGON
+            </button>
+          </div>
+        </div>
+      )}
 
       {canShowBetaPanel && (
         <div style={{ position: 'fixed', right: 14, bottom: 14, zIndex: 70 }}>

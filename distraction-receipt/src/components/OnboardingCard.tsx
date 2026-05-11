@@ -39,7 +39,7 @@ export default function OnboardingCard({ onNext }: OnboardingCardProps) {
               marginBottom: 18,
             }}
           >
-            KROK 1/4
+            KROK 1/3
           </div>
 
           <h1
