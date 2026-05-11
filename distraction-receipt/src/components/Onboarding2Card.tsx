@@ -65,6 +65,12 @@ export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
       } else {
         setHasAccessibilityPermission(false)
         setStatus('Czekam na nadanie uprawnienia Accessibility.')
+        window.setTimeout(() => {
+          void refreshPermissions()
+        }, 1200)
+        window.setTimeout(() => {
+          void refreshPermissions()
+        }, 2800)
       }
     } catch (error) {
       console.error('Błąd:', error)
@@ -73,32 +79,42 @@ export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
     }
   }
 
+  const handleRestartApp = async () => {
+    try {
+      await invoke('restart_app')
+    } catch (error) {
+      console.error('Błąd restartu aplikacji:', error)
+    }
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="h-full w-full">
       <div
         role="dialog"
         aria-label="Onboarding card step 2"
-        className="flex-shrink-0"
+        className="flex-shrink-0 h-full w-full"
         style={{
           width: '100%',
           maxWidth: '100%',
           minWidth: '0',
-          minHeight: '430px',
+          minHeight: '100%',
+          height: '100%',
           background: '#fbfaf5',
-          borderRadius: 8,
-          boxShadow: '0 6px 24px rgba(0,0,0,0.12)',
+          borderRadius: 0,
+          boxShadow: 'none',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'space-between',
-          paddingTop: 44,
-          paddingBottom: 32,
-          paddingLeft: 28,
-          paddingRight: 28,
+          justifyContent: 'flex-start',
+          overflowY: 'auto',
+          paddingTop: 34,
+          paddingBottom: 24,
+          paddingLeft: 24,
+          paddingRight: 24,
           color: '#1c1b1b',
           fontFamily: 'Courier Prime, monospace',
         }}
       >
-        <div style={{ textAlign: 'center' }}>
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div
             style={{
               fontSize: 12,
@@ -125,7 +141,7 @@ export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
           </h1>
         </div>
 
-        <div style={{ textAlign: 'center' }}>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <svg
             width="64"
             height="64"
@@ -160,7 +176,7 @@ export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
           </p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginTop: 'auto', paddingTop: 20 }}>
           <button
             onClick={handleRequestPermissions}
             style={{
@@ -208,6 +224,25 @@ export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
             <div style={{ fontSize: 10, color: '#666', textAlign: 'center', maxWidth: 320 }}>
               {status}
             </div>
+          )}
+
+          {!hasAccessibilityPermission && (
+            <button
+              onClick={handleRestartApp}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#666',
+                cursor: 'pointer',
+                fontFamily: 'Courier Prime, monospace',
+                fontSize: 10,
+                textDecoration: 'underline',
+                textUnderlineOffset: '3px',
+                padding: 0,
+              }}
+            >
+              Mam włączone → uruchom aplikację ponownie
+            </button>
           )}
         </div>
       </div>

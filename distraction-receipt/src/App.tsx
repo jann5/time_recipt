@@ -17,14 +17,16 @@ type ScreenWindowPreset = {
   height: number
 }
 
+const ONBOARDING_COMPLETED_KEY = 'distraction-receipt:onboarding-completed'
+
 const screenWindowPresets: Record<Screen, ScreenWindowPreset> = {
-  onboarding1: { width: 290, height: 500 },
-  onboarding2: { width: 360, height: 640 },
-  onboarding3: { width: 300, height: 620 },
-  onboarding4: { width: 330, height: 560 },
-  daily: { width: 340, height: 640 },
-  weekly: { width: 330, height: 600 },
-  settings: { width: 340, height: 640 },
+  onboarding1: { width: 330, height: 680 },
+  onboarding2: { width: 340, height: 760 },
+  onboarding3: { width: 350, height: 860 },
+  onboarding4: { width: 340, height: 740 },
+  daily: { width: 390, height: 860 },
+  weekly: { width: 380, height: 780 },
+  settings: { width: 390, height: 880 },
 }
 
 interface DebugAppUsage {
@@ -52,7 +54,10 @@ interface DebugTrackingProbe {
  * 360px max-width mobile app container with glassmorphism background
  */
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('onboarding1')
+  const [currentScreen, setCurrentScreen] = useState<Screen>(
+    localStorage.getItem(ONBOARDING_COMPLETED_KEY) === 'true' ? 'daily' : 'onboarding1',
+  )
+  const [selectedHistoryDate, setSelectedHistoryDate] = useState<string | null>(null)
   const [betaOpen, setBetaOpen] = useState(false)
   const [betaStats, setBetaStats] = useState<DebugDailyStats | null>(null)
   const [betaProbe, setBetaProbe] = useState<DebugTrackingProbe | null>(null)
@@ -62,7 +67,18 @@ export default function App() {
   const canShowBetaPanel = currentScreen === 'daily' || currentScreen === 'weekly' || currentScreen === 'settings'
 
   const handleNavigate = (screen: Screen) => {
+    setSelectedHistoryDate(null)
     setCurrentScreen(screen)
+  }
+
+  const handleOpenHistoryDay = (date: string) => {
+    setSelectedHistoryDate(date)
+    setCurrentScreen('daily')
+  }
+
+  const handleCompleteOnboarding = () => {
+    localStorage.setItem(ONBOARDING_COMPLETED_KEY, 'true')
+    handleNavigate('daily')
   }
 
   useEffect(() => {
@@ -94,10 +110,10 @@ export default function App() {
         const scaleFactor = monitor?.scaleFactor ?? 1
 
         const maxLogicalWidth = monitor?.workArea?.size
-          ? Math.max(260, Math.floor(monitor.workArea.size.width / scaleFactor) - 40)
+          ? Math.max(300, Math.floor(monitor.workArea.size.width / scaleFactor) - 40)
           : preset.width
         const maxLogicalHeight = monitor?.workArea?.size
-          ? Math.max(420, Math.floor(monitor.workArea.size.height / scaleFactor) - 60)
+          ? Math.max(560, Math.floor(monitor.workArea.size.height / scaleFactor) - 60)
           : preset.height
 
         const targetWidth = Math.min(preset.width, maxLogicalWidth)
@@ -106,12 +122,17 @@ export default function App() {
         const appWindow = getCurrentWindow()
         const targetSize = new LogicalSize(targetWidth, targetHeight)
 
-        await appWindow.setResizable(false)
-        await appWindow.setMaximizable(false)
-        await appWindow.setMinSize(targetSize)
-        await appWindow.setMaxSize(targetSize)
+        // Reset constraints first, otherwise growing between screens can fail
+        // when previous min/max are tighter than the next target size.
+        await appWindow.setResizable(true)
+        await appWindow.setMaxSize(null)
+        await appWindow.setMinSize(null)
         await appWindow.setSize(targetSize)
         await appWindow.center()
+        await appWindow.setMinSize(targetSize)
+        await appWindow.setMaxSize(targetSize)
+        await appWindow.setResizable(false)
+        await appWindow.setMaximizable(false)
       } catch (error) {
         console.error('Nie udało się dopasować rozmiaru okna:', error)
       }
@@ -172,8 +193,8 @@ export default function App() {
 
   return (
     <div
-      className={`min-h-screen w-full flex items-center justify-center antialiased ${isDailyScreen || isOnboardingScreen ? 'p-0' : 'p-4'}`}
-      style={{ backgroundColor: '#fbfaf5' }}
+      className="h-full w-full antialiased"
+      style={{ backgroundColor: '#fbfaf5', overflow: 'hidden' }}
     >
       {/* Fixed Background - Blur effect behind glass shell (hide for onboarding1 to show only the card) */}
       {currentScreen !== 'onboarding1' && !isDailyScreen && !isOnboardingScreen && (
@@ -185,9 +206,9 @@ export default function App() {
         {currentScreen === 'onboarding1' && <Onboarding1 onNext={() => handleNavigate('onboarding2')} />}
         {currentScreen === 'onboarding2' && <Onboarding2 onNext={() => handleNavigate('onboarding3')} />}
         {currentScreen === 'onboarding3' && <Onboarding3 onNext={() => handleNavigate('onboarding4')} />}
-        {currentScreen === 'onboarding4' && <Onboarding4 onFinish={() => handleNavigate('daily')} onBack={() => handleNavigate('onboarding3')} />}
-        {currentScreen === 'daily' && <DailyReceipt onNavigate={handleNavigate} />}
-        {currentScreen === 'weekly' && <WeeklyReceipt onNavigate={handleNavigate} />}
+        {currentScreen === 'onboarding4' && <Onboarding4 onFinish={handleCompleteOnboarding} onBack={() => handleNavigate('onboarding3')} />}
+        {currentScreen === 'daily' && <DailyReceipt onNavigate={handleNavigate} reportDate={selectedHistoryDate ?? undefined} />}
+        {currentScreen === 'weekly' && <WeeklyReceipt onNavigate={handleNavigate} onOpenDayReceipt={handleOpenHistoryDay} />}
         {currentScreen === 'settings' && <Settings onNavigate={handleNavigate} />}
       </div>
 

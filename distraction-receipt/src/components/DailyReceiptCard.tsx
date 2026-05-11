@@ -21,6 +21,7 @@ interface DailyReport {
 
 interface DailyReceiptCardProps {
   onNavigate?: (screen: 'weekly' | 'settings' | 'daily') => void
+  reportDate?: string
 }
 
 function formatTime(seconds: number): string {
@@ -51,36 +52,57 @@ function HistoryIcon() {
   )
 }
 
-export default function DailyReceiptCard({ onNavigate }: DailyReceiptCardProps) {
+export default function DailyReceiptCard({ onNavigate, reportDate }: DailyReceiptCardProps) {
   const [report, setReport] = useState<DailyReport | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let disposed = false
+
     const fetchReport = async () => {
       try {
-        const data = await invoke<DailyReport>('get_daily_report')
-        setReport(data)
+        const data = await invoke<DailyReport>(
+          reportDate ? 'get_daily_report_for_date' : 'get_daily_report',
+          reportDate ? { date: reportDate } : undefined,
+        )
+        if (!disposed) {
+          setReport(data)
+        }
       } catch (error) {
-        console.error('Błąd pobierania raportu:', error)
+        if (!disposed) {
+          console.error('Błąd pobierania raportu:', error)
+        }
       } finally {
-        setLoading(false)
+        if (!disposed) {
+          setLoading(false)
+        }
       }
     }
 
+    setLoading(true)
     void fetchReport()
 
-    const interval = setInterval(fetchReport, 5000)
+    if (reportDate) {
+      return () => {
+        disposed = true
+      }
+    }
+
+    const interval = window.setInterval(() => {
+      void fetchReport()
+    }, 5000)
     const unlistenPromise = listen<string>('app-switched', () => {
       void fetchReport()
     })
 
     return () => {
+      disposed = true
       clearInterval(interval)
       void unlistenPromise.then((unlisten) => {
         unlisten()
       })
     }
-  }, [])
+  }, [reportDate])
 
   const handleSaveImage = async () => {
     try {
@@ -116,7 +138,7 @@ export default function DailyReceiptCard({ onNavigate }: DailyReceiptCardProps) 
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-full w-full flex items-center justify-center">
         <div style={{ fontFamily: 'Courier Prime, monospace', color: '#666' }}>
           Ładowanie...
         </div>
@@ -125,25 +147,27 @@ export default function DailyReceiptCard({ onNavigate }: DailyReceiptCardProps) 
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="h-full w-full">
       <div
         role="dialog"
         aria-label="Daily receipt"
-        className="flex-shrink-0"
+        className="flex-shrink-0 h-full w-full"
         style={{
           width: '100%',
           maxWidth: '100%',
           minWidth: '0',
-          minHeight: '520px',
+          minHeight: '100%',
+          height: '100%',
           background: '#fbfaf5',
-          borderRadius: 8,
-          boxShadow: '0 6px 24px rgba(0,0,0,0.12)',
+          borderRadius: 0,
+          boxShadow: 'none',
           display: 'flex',
           flexDirection: 'column',
-          paddingTop: 32,
-          paddingBottom: 28,
-          paddingLeft: 32,
-          paddingRight: 32,
+          overflowY: 'auto',
+          paddingTop: 28,
+          paddingBottom: 24,
+          paddingLeft: 24,
+          paddingRight: 24,
           color: '#1c1b1b',
           fontFamily: 'Courier Prime, monospace',
           position: 'relative',

@@ -31,6 +31,7 @@ use core_foundation_sys::string::CFStringRef;
 #[cfg(target_os = "macos")]
 #[link(name = "ApplicationServices", kind = "framework")]
 unsafe extern "C" {
+    fn AXIsProcessTrusted() -> bool;
     fn AXIsProcessTrustedWithOptions(options: CFDictionaryRef) -> bool;
     static kAXTrustedCheckOptionPrompt: CFStringRef;
 }
@@ -411,15 +412,7 @@ async fn get_daily_stats(state: State<'_, AppState>) -> Result<DailyStats, Strin
     Ok(state.daily_stats.lock().await.clone())
 }
 
-#[tauri::command]
-async fn get_daily_report(state: State<'_, AppState>) -> Result<DailyReport, String> {
-    state.ensure_current_day().await?;
-    flush_current_activity_elapsed(&state).await?;
-    state.save_daily_stats().await?;
-
-    let stats = state.daily_stats.lock().await.clone();
-    let settings = state.settings.lock().await.clone();
-
+fn build_daily_report_from_stats(stats: DailyStats, settings: &UserSettings) -> DailyReport {
     let mut productive_apps = Vec::new();
     let mut distraction_apps = Vec::new();
     let mut neutral_apps = Vec::new();
@@ -436,7 +429,7 @@ async fn get_daily_report(state: State<'_, AppState>) -> Result<DailyReport, Str
             continue;
         }
 
-        match classify_usage(&app, &settings) {
+        match classify_usage(&app, settings) {
             UsageBucket::Productive => {
                 total_productive_seconds += app.time_seconds;
                 productive_apps.push(app);
@@ -452,9 +445,9 @@ async fn get_daily_report(state: State<'_, AppState>) -> Result<DailyReport, Str
         }
     }
 
-    Ok(DailyReport {
+    DailyReport {
         date: stats.date,
-        daily_report_time: settings.daily_report_time,
+        daily_report_time: settings.daily_report_time.clone(),
         productive_apps,
         distraction_apps,
         neutral_apps,
@@ -462,7 +455,41 @@ async fn get_daily_report(state: State<'_, AppState>) -> Result<DailyReport, Str
         total_productive_seconds,
         total_distraction_seconds,
         total_neutral_seconds,
-    })
+    }
+}
+
+#[tauri::command]
+async fn get_daily_report(state: State<'_, AppState>) -> Result<DailyReport, String> {
+    state.ensure_current_day().await?;
+    flush_current_activity_elapsed(&state).await?;
+    state.save_daily_stats().await?;
+
+    let stats = state.daily_stats.lock().await.clone();
+    let settings = state.settings.lock().await.clone();
+    Ok(build_daily_report_from_stats(stats, &settings))
+}
+
+#[tauri::command]
+async fn get_daily_report_for_date(
+    date: String,
+    state: State<'_, AppState>,
+) -> Result<DailyReport, String> {
+    let parsed = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
+        .map_err(|_| "date must be in YYYY-MM-DD format".to_string())?;
+    let date_key = parsed.format("%Y-%m-%d").to_string();
+
+    state.ensure_current_day().await?;
+
+    let stats = if date_key == today_key() {
+        flush_current_activity_elapsed(&state).await?;
+        state.save_daily_stats().await?;
+        state.daily_stats.lock().await.clone()
+    } else {
+        AppState::load_daily_stats(&state.data_dir, &date_key)
+    };
+    let settings = state.settings.lock().await.clone();
+
+    Ok(build_daily_report_from_stats(stats, &settings))
 }
 
 #[tauri::command]
@@ -831,26 +858,23 @@ async fn save_receipt_as_image(
 
 #[tauri::command]
 async fn request_macos_permissions(open_settings: Option<bool>) -> Result<bool, String> {
-    let accessibility_trusted = check_accessibility_permissions(true);
-    if open_settings.unwrap_or(false) || !accessibility_trusted {
+    let trusted_before = has_runtime_tracking_permissions();
+    if open_settings.unwrap_or(false) || !trusted_before {
+        let _ = check_accessibility_permissions(true);
         open_accessibility_settings();
     }
-
-    // Accessibility API by itself can be flaky in some setups.
-    // If we can already read the frontmost app, treat permissions as ready.
-    let can_read_frontmost = read_frontmost_app_name().is_ok();
-    Ok(accessibility_trusted || can_read_frontmost)
+    Ok(has_runtime_tracking_permissions())
 }
 
 #[tauri::command]
 async fn check_macos_permissions() -> Result<bool, String> {
-    let accessibility_trusted = check_accessibility_permissions(false);
-    if accessibility_trusted {
-        return Ok(true);
-    }
+    Ok(has_runtime_tracking_permissions())
+}
 
-    let can_read_frontmost = read_frontmost_app_name().is_ok();
-    Ok(can_read_frontmost)
+#[tauri::command]
+async fn restart_app(app: tauri::AppHandle) -> Result<(), String> {
+    app.request_restart();
+    Ok(())
 }
 
 fn read_frontmost_app_name() -> Result<String, String> {
@@ -892,7 +916,7 @@ fn read_frontmost_app_name() -> Result<String, String> {
 
 #[tauri::command]
 async fn get_tracking_probe() -> Result<TrackingProbe, String> {
-    let accessibility_permission = check_accessibility_permissions(false);
+    let accessibility_permission = has_runtime_tracking_permissions();
     if !accessibility_permission {
         return Ok(TrackingProbe {
             accessibility_permission,
@@ -2055,6 +2079,11 @@ fn upsert_app_usage(apps: &mut Vec<AppUsage>, context: &ActivityContext, elapsed
 
 #[cfg(target_os = "macos")]
 fn check_accessibility_permissions(prompt: bool) -> bool {
+    let plain_trusted = unsafe { AXIsProcessTrusted() };
+    if plain_trusted {
+        return true;
+    }
+
     let value = unsafe {
         if prompt {
             kCFBooleanTrue
@@ -2080,15 +2109,24 @@ fn check_accessibility_permissions(prompt: bool) -> bool {
             return false;
         }
 
-        let trusted = AXIsProcessTrustedWithOptions(options);
+        let trusted_with_options = AXIsProcessTrustedWithOptions(options);
         CFRelease(options.cast::<c_void>());
-        trusted
+        let trusted_plain_after = AXIsProcessTrusted();
+        trusted_with_options || trusted_plain_after
     }
 }
 
 #[cfg(not(target_os = "macos"))]
 fn check_accessibility_permissions(_prompt: bool) -> bool {
     true
+}
+
+fn has_runtime_tracking_permissions() -> bool {
+    if check_accessibility_permissions(false) {
+        return true;
+    }
+
+    read_frontmost_app_name().is_ok()
 }
 
 fn open_accessibility_settings() {
@@ -2107,11 +2145,9 @@ pub fn run() {
         .manage(AppState::new())
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
-                let startup_size = LogicalSize::new(290.0, 500.0);
+                let startup_size = LogicalSize::new(330.0, 680.0);
                 let _ = window.set_resizable(false);
                 let _ = window.set_maximizable(false);
-                let _ = window.set_min_size(Some(LogicalSize::new(260.0, 420.0)));
-                let _ = window.set_max_size(Some(startup_size));
                 let _ = window.set_size(startup_size);
                 let _ = window.center();
             }
@@ -2188,6 +2224,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_daily_stats,
             get_daily_report,
+            get_daily_report_for_date,
             get_settings,
             get_browser_insights,
             get_app_insights,
@@ -2198,6 +2235,7 @@ pub fn run() {
             get_weekly_history,
             mark_day_off,
             check_macos_permissions,
+            restart_app,
             get_tracking_probe,
             request_macos_permissions,
             save_receipt_as_image,

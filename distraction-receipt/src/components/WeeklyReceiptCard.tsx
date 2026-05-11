@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 
 interface WeeklyReceiptCardProps {
   onNavigate?: (screen: 'weekly' | 'settings' | 'daily') => void
+  onOpenDayReceipt?: (date: string) => void
 }
 
 interface WeeklyDayHistory {
@@ -57,7 +58,7 @@ function FlameIcon() {
   )
 }
 
-export default function WeeklyReceiptCard({ onNavigate }: WeeklyReceiptCardProps) {
+export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: WeeklyReceiptCardProps) {
   const [history, setHistory] = useState<WeeklyHistory>(fallbackHistory)
   const [loading, setLoading] = useState(true)
 
@@ -86,25 +87,27 @@ export default function WeeklyReceiptCard({ onNavigate }: WeeklyReceiptCardProps
     : `${history.best_day_label} (${history.best_day_productivity}%)`
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="h-full w-full">
       <div
         role="dialog"
         aria-label="Weekly history"
-        className="flex-shrink-0"
+        className="flex-shrink-0 h-full w-full"
         style={{
           width: '100%',
           maxWidth: '100%',
           minWidth: '0',
-          minHeight: '480px',
+          minHeight: '100%',
+          height: '100%',
           background: '#fbfaf5',
-          borderRadius: 8,
-          boxShadow: '0 6px 24px rgba(0,0,0,0.12)',
+          borderRadius: 0,
+          boxShadow: 'none',
           display: 'flex',
           flexDirection: 'column',
-          paddingTop: 32,
-          paddingBottom: 28,
-          paddingLeft: 32,
-          paddingRight: 32,
+          overflowY: 'auto',
+          paddingTop: 28,
+          paddingBottom: 24,
+          paddingLeft: 24,
+          paddingRight: 24,
           color: '#1c1b1b',
           fontFamily: "Courier Prime, monospace",
           position: 'relative',
@@ -183,15 +186,27 @@ export default function WeeklyReceiptCard({ onNavigate }: WeeklyReceiptCardProps
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {weekData.map((day, index) => (
-              <div
+              <button
                 key={`${day.day}-${index}`}
+                type="button"
+                onClick={() => {
+                  if (day.date) {
+                    onOpenDayReceipt && onOpenDayReceipt(day.date)
+                  }
+                }}
                 style={{
+                  width: '100%',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   padding: '10px 0',
+                  border: 'none',
+                  background: 'none',
+                  textAlign: 'left',
+                  cursor: day.date ? 'pointer' : 'default',
                   borderBottom: index < weekData.length - 1 ? '1px dashed #e8e8e8' : 'none',
                 }}
+                aria-label={day.date ? `Pokaż paragon z dnia ${day.date}` : `Dzień ${day.day}`}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 11, width: 32 }}>{day.day}</span>
@@ -220,7 +235,7 @@ export default function WeeklyReceiptCard({ onNavigate }: WeeklyReceiptCardProps
                     {day.productivity > 0 ? `${day.productivity}%` : '-'}
                   </span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
 
