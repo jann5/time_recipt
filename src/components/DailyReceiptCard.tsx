@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { save as openSaveDialog } from '@tauri-apps/plugin-dialog'
 import html2canvas from 'html2canvas'
 
 interface AppUsage {
   name: string
   time_seconds: number
+  activity_kind?: 'app' | 'browser_tab'
 }
 
 interface DailyReport {
@@ -14,7 +16,6 @@ interface DailyReport {
   productive_apps: AppUsage[]
   distraction_apps: AppUsage[]
   neutral_apps: AppUsage[]
-  alt_tab_count: number
   total_productive_seconds: number
   total_distraction_seconds: number
   total_neutral_seconds: number
@@ -55,6 +56,51 @@ function HistoryIcon() {
   )
 }
 
+const RECEIPT_EXPORT_WIDTH = 1200
+const RECEIPT_EXPORT_HEIGHT = 1800
+const RECEIPT_EXPORT_PADDING = 52
+const SHORT_ENTRY_THRESHOLD_SECONDS = 5 * 60
+
+function aggregateShortEntries(
+  entries: AppUsage[],
+  labels: { otherAppsLabel: string; otherTabsLabel: string },
+): AppUsage[] {
+  let shortAppsSeconds = 0
+  let shortTabsSeconds = 0
+  const regularEntries: AppUsage[] = []
+
+  for (const entry of entries) {
+    if (entry.time_seconds < SHORT_ENTRY_THRESHOLD_SECONDS) {
+      if (entry.activity_kind === 'browser_tab') {
+        shortTabsSeconds += entry.time_seconds
+      } else {
+        shortAppsSeconds += entry.time_seconds
+      }
+      continue
+    }
+
+    regularEntries.push(entry)
+  }
+
+  if (shortAppsSeconds > 0) {
+    regularEntries.push({
+      name: labels.otherAppsLabel,
+      time_seconds: shortAppsSeconds,
+      activity_kind: 'app',
+    })
+  }
+
+  if (shortTabsSeconds > 0) {
+    regularEntries.push({
+      name: labels.otherTabsLabel,
+      time_seconds: shortTabsSeconds,
+      activity_kind: 'browser_tab',
+    })
+  }
+
+  return regularEntries.sort((a, b) => b.time_seconds - a.time_seconds)
+}
+
 export default function DailyReceiptCard({
   onNavigate,
   reportDate,
@@ -62,9 +108,11 @@ export default function DailyReceiptCard({
   onConfirmReadyReceipt,
 }: DailyReceiptCardProps) {
   const receiptCaptureRef = useRef<HTMLDivElement | null>(null)
+  const saveFeedbackTimerRef = useRef<number | null>(null)
   const [report, setReport] = useState<DailyReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [isSavingReceiptImage, setIsSavingReceiptImage] = useState(false)
+  const [saveImageState, setSaveImageState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [readyReceiptError, setReadyReceiptError] = useState('')
   const isHistoricalReport = Boolean(reportDate)
   const isReadyForConfirmation = Boolean(
@@ -127,55 +175,120 @@ export default function DailyReceiptCard({
       throw new Error('Receipt root not found')
     }
 
+    const previousScrollTop = receiptElement.scrollTop
+    receiptElement.scrollTop = 0
+
     const captureWidth = Math.max(receiptElement.scrollWidth, receiptElement.clientWidth, 390)
     const captureHeight = Math.max(receiptElement.scrollHeight, receiptElement.clientHeight, 860)
-    const canvas = await html2canvas(receiptElement, {
-      backgroundColor: '#fbfaf5',
-      scale: 2,
-      useCORS: true,
-      width: captureWidth,
-      height: captureHeight,
-      windowWidth: captureWidth,
-      windowHeight: captureHeight,
-      scrollX: 0,
-      scrollY: 0,
-      onclone: (documentClone) => {
-        const clonedRoot = documentClone.querySelector<HTMLElement>('[data-receipt-capture-root="true"]')
-        if (!clonedRoot) {
-          return
-        }
-        clonedRoot.style.height = 'auto'
-        clonedRoot.style.minHeight = '0'
-        clonedRoot.style.maxHeight = 'none'
-        clonedRoot.style.overflow = 'visible'
-      },
-    })
+    try {
+      const canvas = await html2canvas(receiptElement, {
+        backgroundColor: '#fbfaf5',
+        scale: 3,
+        useCORS: true,
+        width: captureWidth,
+        height: captureHeight,
+        windowWidth: captureWidth,
+        windowHeight: captureHeight,
+        scrollX: 0,
+        scrollY: -window.scrollY,
+        onclone: (documentClone) => {
+          documentClone.documentElement.style.height = 'auto'
+          documentClone.documentElement.style.overflow = 'visible'
+          documentClone.body.style.height = 'auto'
+          documentClone.body.style.overflow = 'visible'
 
-    return canvas.toDataURL('image/png')
+          const clonedRoot = documentClone.querySelector<HTMLElement>('[data-receipt-capture-root="true"]')
+          if (!clonedRoot) {
+            return
+          }
+          clonedRoot.style.height = 'auto'
+          clonedRoot.style.minHeight = '0'
+          clonedRoot.style.maxHeight = 'none'
+          clonedRoot.style.overflow = 'visible'
+        },
+      })
+
+      const exportCanvas = document.createElement('canvas')
+      exportCanvas.width = RECEIPT_EXPORT_WIDTH
+      exportCanvas.height = RECEIPT_EXPORT_HEIGHT
+
+      const exportContext = exportCanvas.getContext('2d')
+      if (!exportContext) {
+        throw new Error('Cannot create export canvas context')
+      }
+
+      exportContext.fillStyle = '#fbfaf5'
+      exportContext.fillRect(0, 0, RECEIPT_EXPORT_WIDTH, RECEIPT_EXPORT_HEIGHT)
+
+      const maxDrawWidth = RECEIPT_EXPORT_WIDTH - RECEIPT_EXPORT_PADDING * 2
+      const maxDrawHeight = RECEIPT_EXPORT_HEIGHT - RECEIPT_EXPORT_PADDING * 2
+      const drawScale = Math.min(maxDrawWidth / canvas.width, maxDrawHeight / canvas.height)
+      const drawWidth = Math.max(1, Math.floor(canvas.width * drawScale))
+      const drawHeight = Math.max(1, Math.floor(canvas.height * drawScale))
+      const drawX = Math.floor((RECEIPT_EXPORT_WIDTH - drawWidth) / 2)
+      const drawY = Math.floor((RECEIPT_EXPORT_HEIGHT - drawHeight) / 2)
+
+      exportContext.drawImage(canvas, drawX, drawY, drawWidth, drawHeight)
+
+      return exportCanvas.toDataURL('image/png')
+    } finally {
+      receiptElement.scrollTop = previousScrollTop
+    }
+  }
+
+  const scheduleSaveFeedbackReset = (delayMs: number) => {
+    if (saveFeedbackTimerRef.current !== null) {
+      window.clearTimeout(saveFeedbackTimerRef.current)
+      saveFeedbackTimerRef.current = null
+    }
+    saveFeedbackTimerRef.current = window.setTimeout(() => {
+      setSaveImageState('idle')
+      saveFeedbackTimerRef.current = null
+    }, delayMs)
   }
 
   const handleSaveImage = async (showAlerts = true): Promise<boolean> => {
     setIsSavingReceiptImage(true)
+    setSaveImageState('saving')
     if (!showAlerts) {
       setReadyReceiptError('')
     }
 
     try {
       const imageDataUrl = await captureReceiptAsPngDataUrl()
+      const targetDate = report?.date ?? reportDate ?? new Date().toISOString().slice(0, 10)
+      const defaultFilename = `fugit_raport_${targetDate}.png`
+      const selectedPath = await openSaveDialog({
+        title: 'Zapisz obraz paragonu',
+        defaultPath: defaultFilename,
+        canCreateDirectories: true,
+        filters: [
+          {
+            name: 'PNG',
+            extensions: ['png'],
+          },
+        ],
+      })
+
+      if (!selectedPath) {
+        setSaveImageState('idle')
+        return false
+      }
+
       const path = await invoke<string>('save_receipt_as_image', {
         imageDataUrl,
-        date: report?.date ?? reportDate ?? undefined,
+        date: targetDate,
+        targetPath: selectedPath,
       })
       console.log('Zapisano obraz:', path)
-      if (showAlerts) {
-        alert('Paragon zapisany!')
-      }
+      setSaveImageState('saved')
+      scheduleSaveFeedbackReset(1800)
       return true
     } catch (error) {
       console.error('Błąd zapisywania:', error)
-      if (showAlerts) {
-        alert('Błąd podczas zapisywania')
-      } else {
+      setSaveImageState('error')
+      scheduleSaveFeedbackReset(2500)
+      if (!showAlerts) {
         setReadyReceiptError('Nie udało się zapisać obrazu. Spróbuj ponownie.')
       }
       return false
@@ -199,6 +312,14 @@ export default function DailyReceiptCard({
     }
   }, [isReadyForConfirmation])
 
+  useEffect(() => {
+    return () => {
+      if (saveFeedbackTimerRef.current !== null) {
+        window.clearTimeout(saveFeedbackTimerRef.current)
+      }
+    }
+  }, [])
+
   const productiveApps = report?.productive_apps ?? []
   const distractionApps = report?.distraction_apps ?? []
   const neutralApps = report?.neutral_apps ?? []
@@ -212,8 +333,14 @@ export default function DailyReceiptCard({
     ? Math.round((totalProductive / totalTime) * 100)
     : 0
 
-  const sortedProductive = [...productiveApps].sort((a, b) => b.time_seconds - a.time_seconds)
-  const sortedDistraction = [...distractionApps].sort((a, b) => b.time_seconds - a.time_seconds)
+  const sortedProductive = aggregateShortEntries(productiveApps, {
+    otherAppsLabel: 'Inne produktywne aplikacje',
+    otherTabsLabel: 'Inne produktywne karty',
+  })
+  const sortedDistraction = aggregateShortEntries(distractionApps, {
+    otherAppsLabel: 'Inne nieproduktywne aplikacje',
+    otherTabsLabel: 'Inne nieproduktywne karty',
+  })
   const sortedNeutral = [...neutralApps].sort((a, b) => b.time_seconds - a.time_seconds)
 
   const today = report?.date
@@ -317,7 +444,7 @@ export default function DailyReceiptCard({
               textTransform: 'uppercase',
             }}
           >
-            DISTRACTION CO.
+            FUGIT
           </div>
 
           <div style={{ width: 40, height: 1, background: '#1c1b1b', margin: '0 auto 16px' }} />
@@ -592,19 +719,6 @@ export default function DailyReceiptCard({
             WYDAJNOŚĆ DNIA: {productivity}%
           </div>
 
-          <div
-            style={{
-              fontSize: 11,
-              marginBottom: 12,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              letterSpacing: '0.05em',
-            }}
-          >
-            <span>Alt+Tab: {report?.alt_tab_count || 0}</span>
-          </div>
-
           <div style={{ fontSize: 10, color: '#888', fontStyle: 'italic', letterSpacing: '0.03em' }}>
             {totalTime > 0
               ? `Śledzenie aktywne od ${formatTime(totalTime)}`
@@ -614,7 +728,7 @@ export default function DailyReceiptCard({
 
         <div style={{ flex: 1 }} />
 
-        <div style={{ marginTop: 'auto' }}>
+        <div style={{ marginTop: 'auto' }} data-html2canvas-ignore="true">
           <div style={{ borderTop: '1px dashed #c4c4c4', marginBottom: 20 }} />
 
           <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -622,28 +736,42 @@ export default function DailyReceiptCard({
               onClick={() => {
                 void handleSaveImage()
               }}
+              disabled={isSavingReceiptImage}
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#1c1b1b',
-                cursor: 'pointer',
+                color: saveImageState === 'saved'
+                  ? '#1f7a3f'
+                  : saveImageState === 'error'
+                    ? '#8a3c3c'
+                    : '#1c1b1b',
+                cursor: isSavingReceiptImage ? 'default' : 'pointer',
                 fontFamily: 'Courier Prime, monospace',
                 fontSize: 10,
                 letterSpacing: '0.1em',
                 textDecoration: 'underline',
                 textUnderlineOffset: '3px',
                 padding: 0,
-                opacity: 0.7,
-                transition: 'opacity 0.2s',
+                opacity: isSavingReceiptImage ? 0.9 : 0.75,
+                transform: saveImageState === 'saved' ? 'scale(1.06)' : 'scale(1)',
+                transition: 'opacity 0.2s, transform 0.2s ease, color 0.2s ease',
               }}
               onMouseEnter={(event) => {
-                event.currentTarget.style.opacity = '1'
+                if (!isSavingReceiptImage) {
+                  event.currentTarget.style.opacity = '1'
+                }
               }}
               onMouseLeave={(event) => {
-                event.currentTarget.style.opacity = '0.7'
+                event.currentTarget.style.opacity = isSavingReceiptImage ? '0.9' : '0.75'
               }}
             >
-              Zapisz obraz
+              {saveImageState === 'saving'
+                ? 'Zapisywanie...'
+                : saveImageState === 'saved'
+                  ? 'Zapisano ✓'
+                  : saveImageState === 'error'
+                    ? 'Błąd zapisu'
+                    : 'Zapisz obraz'}
             </button>
           </div>
         </div>

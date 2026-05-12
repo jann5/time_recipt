@@ -8,8 +8,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::TrayIconBuilder;
 use tauri::{Emitter, LogicalSize, Manager, State};
 use tokio::sync::Mutex;
 use url::Url;
@@ -124,6 +124,7 @@ pub struct WeeklyDayHistory {
     pub day: String,
     pub productivity: u8,
     pub streak: bool,
+    pub is_rest_day: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -230,6 +231,7 @@ struct AppState {
     activity_start_time: Arc<Mutex<Option<Instant>>>,
     daily_stats: Arc<Mutex<DailyStats>>,
     settings: Arc<Mutex<UserSettings>>,
+    rest_days: Arc<Mutex<HashSet<String>>>,
     alt_tab_count: Arc<Mutex<u64>>,
     last_front_app: Arc<Mutex<Option<String>>>,
     data_dir: PathBuf,
@@ -241,6 +243,7 @@ impl AppState {
         let _ = fs::create_dir_all(&data_dir);
 
         let settings = Self::load_settings(&data_dir);
+        let rest_days = Self::load_rest_days(&data_dir);
         let active_day = active_receipt_day_key(&settings);
         let stats = Self::load_daily_stats(&data_dir, &active_day);
 
@@ -249,6 +252,7 @@ impl AppState {
             activity_start_time: Arc::new(Mutex::new(None)),
             daily_stats: Arc::new(Mutex::new(stats)),
             settings: Arc::new(Mutex::new(settings)),
+            rest_days: Arc::new(Mutex::new(rest_days)),
             alt_tab_count: Arc::new(Mutex::new(0)),
             last_front_app: Arc::new(Mutex::new(None)),
             data_dir,
@@ -256,7 +260,7 @@ impl AppState {
     }
 
     fn get_data_dir() -> PathBuf {
-        ProjectDirs::from("com", "jannawrot", "distraction-receipt")
+        ProjectDirs::from("com", "jannawrot", "fugit")
             .map(|dirs| dirs.data_local_dir().to_path_buf())
             .unwrap_or_else(|| PathBuf::from("./data"))
     }
@@ -287,6 +291,24 @@ impl AppState {
         normalize_settings(UserSettings::default())
     }
 
+    fn load_rest_days(data_dir: &PathBuf) -> HashSet<String> {
+        let path = data_dir.join("rest_days.json");
+        let parsed = fs::read_to_string(&path)
+            .ok()
+            .and_then(|content| serde_json::from_str::<Vec<String>>(&content).ok())
+            .unwrap_or_default();
+
+        parsed
+            .into_iter()
+            .filter_map(|entry| {
+                let trimmed = entry.trim();
+                NaiveDate::parse_from_str(trimmed, "%Y-%m-%d")
+                    .ok()
+                    .map(|date| date.format("%Y-%m-%d").to_string())
+            })
+            .collect()
+    }
+
     fn write_json_atomic<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
         let json = serde_json::to_string_pretty(value).map_err(|e| e.to_string())?;
         let temp_path = path.with_extension("tmp");
@@ -309,6 +331,19 @@ impl AppState {
         let settings = self.settings.lock().await.clone();
         let path = self.data_dir.join("settings.json");
         Self::write_json_atomic(&path, &settings)
+    }
+
+    pub async fn save_rest_days(&self) -> Result<(), String> {
+        let mut dates = self
+            .rest_days
+            .lock()
+            .await
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        dates.sort();
+        let path = self.data_dir.join("rest_days.json");
+        Self::write_json_atomic(&path, &dates)
     }
 
     pub async fn ensure_current_day(&self) -> Result<Option<String>, String> {
@@ -733,6 +768,7 @@ async fn get_weekly_history(state: State<'_, AppState>) -> Result<WeeklyHistory,
     state.save_daily_stats().await?;
 
     let settings = state.settings.lock().await.clone();
+    let rest_days = state.rest_days.lock().await.clone();
     let all_stats = state.read_daily_stats_files();
     let today = NaiveDate::parse_from_str(&state.daily_stats.lock().await.date, "%Y-%m-%d")
         .unwrap_or_else(|_| Local::now().date_naive());
@@ -755,15 +791,16 @@ async fn get_weekly_history(state: State<'_, AppState>) -> Result<WeeklyHistory,
             Some(stats) => calculate_day_split(stats, &settings),
             None => (0, 0),
         };
+        let is_rest_day = rest_days.contains(&day_key);
 
         let total = productive + distraction;
-        let productivity = if total == 0 {
+        let productivity = if is_rest_day || total == 0 {
             0
         } else {
             ((productive as f64 / total as f64) * 100.0).round() as u8
         };
 
-        if total > 0 {
+        if total > 0 && !is_rest_day {
             average_sum += productivity as u64;
             average_count += 1;
             if productivity >= best_day_productivity {
@@ -776,7 +813,8 @@ async fn get_weekly_history(state: State<'_, AppState>) -> Result<WeeklyHistory,
             date: day_key,
             day: day_label.to_string(),
             productivity,
-            streak: productivity >= 70,
+            streak: productivity >= 70 && !is_rest_day,
+            is_rest_day,
         });
     }
 
@@ -808,34 +846,54 @@ async fn mark_day_off(date: String, state: State<'_, AppState>) -> Result<(), St
     let date_key = parsed.format("%Y-%m-%d").to_string();
 
     state.ensure_current_day().await?;
+    flush_current_activity_elapsed(&state).await?;
+    state.save_daily_stats().await?;
 
-    let today = state.daily_stats.lock().await.date.clone();
-    if date_key == today {
-        {
-            let mut stats = state.daily_stats.lock().await;
-            stats.apps.clear();
-            stats.alt_tab_count = 0;
-            stats.last_updated = Local::now().to_rfc3339();
+    let week_start = parsed - ChronoDuration::days(parsed.weekday().num_days_from_monday() as i64);
+    let week_end = week_start + ChronoDuration::days(6);
+
+    {
+        let mut rest_days = state.rest_days.lock().await;
+        let mut invalid = Vec::new();
+        for candidate in rest_days.iter() {
+            if NaiveDate::parse_from_str(candidate, "%Y-%m-%d").is_err() {
+                invalid.push(candidate.clone());
+            }
         }
-        {
-            let mut alt_tab_count = state.alt_tab_count.lock().await;
-            *alt_tab_count = 0;
+        for candidate in invalid {
+            rest_days.remove(&candidate);
         }
-        return state.save_daily_stats().await;
+
+        let existing_for_week = rest_days.iter().find_map(|candidate| {
+            NaiveDate::parse_from_str(candidate, "%Y-%m-%d")
+                .ok()
+                .filter(|day| *day >= week_start && *day <= week_end)
+                .map(|_| candidate.clone())
+        });
+
+        match existing_for_week {
+            Some(existing) if existing == date_key => {
+                rest_days.remove(&existing);
+            }
+            Some(existing) => {
+                return Err(format!(
+                    "W tym tygodniu Rest day jest już ustawiony ({existing}). Najpierw go odznacz."
+                ));
+            }
+            None => {
+                rest_days.insert(date_key);
+            }
+        }
     }
 
-    let mut stats = AppState::load_daily_stats(&state.data_dir, &date_key);
-    stats.apps.clear();
-    stats.alt_tab_count = 0;
-    stats.last_updated = Local::now().to_rfc3339();
-    let path = state.data_dir.join(format!("{date_key}.json"));
-    AppState::write_json_atomic(&path, &stats)
+    state.save_rest_days().await
 }
 
 #[tauri::command]
 async fn save_receipt_as_image(
     image_data_url: String,
     date: Option<String>,
+    target_path: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     state.ensure_current_day().await?;
@@ -855,11 +913,27 @@ async fn save_receipt_as_image(
         .decode(base64_payload)
         .map_err(|error| format!("invalid base64 image payload: {error}"))?;
 
-    let receipts_dir = state.data_dir.join("receipts");
-    fs::create_dir_all(&receipts_dir).map_err(|e| e.to_string())?;
+    let filepath = if let Some(path_value) = target_path {
+        let trimmed = path_value.trim();
+        if trimmed.is_empty() {
+            return Err("target_path cannot be empty".to_string());
+        }
 
-    let filename = format!("receipt_{target_date}.png");
-    let filepath = receipts_dir.join(&filename);
+        let mut chosen = PathBuf::from(trimmed);
+        if chosen.extension().is_none() {
+            chosen.set_extension("png");
+        }
+        if let Some(parent) = chosen.parent() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        chosen
+    } else {
+        let receipts_dir = state.data_dir.join("receipts");
+        fs::create_dir_all(&receipts_dir).map_err(|e| e.to_string())?;
+        let filename = format!("receipt_{target_date}.png");
+        receipts_dir.join(&filename)
+    };
+
     fs::write(&filepath, image_bytes).map_err(|e| e.to_string())?;
 
     Ok(filepath.to_string_lossy().to_string())
@@ -1115,6 +1189,12 @@ async fn tracking_loop(state: Arc<AppState>, app_handle: tauri::AppHandle) {
 
     loop {
         interval.tick().await;
+
+        // Do not read active windows/apps until Accessibility is granted.
+        // This prevents permission prompts before onboarding step 2.
+        if !has_runtime_tracking_permissions() {
+            continue;
+        }
 
         let switched_from_date = match state.ensure_current_day().await {
             Ok(switched_from_date) => switched_from_date,
@@ -1796,19 +1876,28 @@ fn classify_native_app_from_catalog(app_name: &str) -> Option<DomainClassificati
         "xcode",
         "android studio",
         "intellij idea",
+        "intellij",
         "pycharm",
         "webstorm",
         "goland",
         "clion",
         "datagrip",
         "rider",
+        "rustrover",
+        "phpstorm",
+        "rubymine",
         "terminal",
         "iterm2",
         "warp",
+        "hyper",
+        "kitty",
+        "ghostty",
         "postman",
         "insomnia",
         "docker desktop",
+        "orbstack",
         "figma",
+        "figjam",
         "slack",
         "microsoft teams",
         "zoom",
@@ -1824,25 +1913,271 @@ fn classify_native_app_from_catalog(app_name: &str) -> Option<DomainClassificati
         "kalendarz",
         "mail",
         "outlook",
+        "spark",
+        "airmail",
         "thunderbird",
         "jira",
         "linear",
+        "asana",
+        "trello",
+        "clickup",
+        "monday",
+        "basecamp",
+        "confluence",
+        "miro",
+        "whimsical",
+        "framer",
+        "sketch",
+        "adobe photoshop",
+        "adobe illustrator",
+        "adobe xd",
+        "adobe premiere pro",
+        "adobe after effects",
+        "final cut pro",
+        "davinci resolve",
+        "blender",
+        "canva",
+        "loom",
+        "screenflow",
+        "obs",
+        "obs studio",
+        "quicktime player",
+        "transmission",
+        "handbrake",
+        "tableplus",
+        "sequel ace",
+        "dbeaver",
+        "beekeeper studio",
+        "mongodb compass",
+        "pgadmin 4",
+        "redis insight",
+        "tableau",
+        "power bi",
+        "excel",
+        "word",
+        "powerpoint",
+        "libreoffice writer",
+        "libreoffice calc",
+        "libreoffice impress",
+        "google drive",
+        "dropbox",
+        "onedrive",
+        "anytype",
+        "agenda",
+        "todoist",
+        "ticktick",
+        "things",
+        "omnifocus",
+        "fantastical",
+        "reminders",
+        "zotero",
+        "devonthink",
+        "anki",
+        "ankiapp",
+        "claude",
+        "chatgpt",
+        "openai",
+        "perplexity",
+        "gemini",
+        "codex",
+        "opencode",
+        "wallspace",
+        "v0",
+        "copilot",
+        "github desktop",
+        "gitkraken",
+        "fork",
+        "sourcetree",
+        "tower",
+        "sourcetree",
+        "github",
+        "gitbutler",
+        "arc browser devtools",
+        "notepad++",
+        "bbedit",
+        "nova",
+        "zed preview",
+        "vim",
+        "neovim",
+        "emacs",
+        "mimestream",
+        "todo",
+        "shortcuts",
+        "automator",
+        "activity monitor",
+        "system settings",
+        "ustawienia systemowe",
+        "safari technology preview",
+        "google chrome",
+        "brave browser",
+        "arc",
+        "firefox",
+        "microsoft edge",
+        "opera",
+        "opera developer",
+        "orion",
+        "vivaldi",
+        "1password",
+        "bitwarden",
+        "authy",
+        "aegis authenticator",
+        "kap",
+        "cleanmymac",
+        "istat menus",
+        "istatistica",
+        "launchbar",
+        "setapp",
+        "bettertouchtool",
+        "rectangle",
+        "magnet",
+        "bartender",
+        "hidden bar",
+        "karabiner-elements",
+        "macs fan control",
+        "logi options+",
+        "betterdisplay",
+        "lunar",
+        "maccy",
+        "copyclip",
+        "pastebot",
+        "paste",
+        "dropover",
+        "shottr",
+        "cleanshot x",
+        "xnip",
+        "pixelmator pro",
+        "pixelmator",
+        "affinity photo",
+        "affinity designer",
+        "affinity publisher",
+        "capture one",
+        "lightroom",
+        "lightroom classic",
+        "logic pro",
+        "garageband",
+        "ableton live",
+        "fl studio",
+        "reaper",
+        "audacity",
+        "notability",
+        "goodnotes",
+        "pdf expert",
+        "skim",
+        "bookends",
+        "mendeley",
+        "readwise",
+        "readwise reader",
+        "kindle",
+        "calibre",
+        "joplin",
+        "standard notes",
+        "logseq",
+        "roam research",
+        "amie",
+        "cron",
+        "superhuman",
+        "hey",
+        "front",
+        "mailmate",
+        "postico 2",
+        "navicat premium",
+        "db browser for sqlite",
+        "sqlpro studio",
+        "inspector",
+        "httpie",
+        "paw",
+        "bruno",
+        "yaak",
+        "hoppscotch",
+        "wireshark",
+        "charles",
+        "proximan",
+        "proxyman",
+        "orion browser",
+        "responsively app",
+        "simulator",
+        "ios simulator",
+        "android emulator",
+        "xcodes",
+        "swift playgrounds",
+        "rapidapi",
+        "beekeeper",
+        "devtoys",
+        "draw.io",
+        "diagrams",
+        "drawio",
+        "excalidraw",
+        "zeplin",
+        "invision",
+        "principle",
+        "origami studio",
+        "vectornator",
+        "linearity curve",
+        "loom desktop",
+        "descript",
+        "cap",
+        "riverside",
+        "notta",
+        "otter",
+        "granola",
+        "cursor nightly",
+        "insiders",
+        "visual studio code - insiders",
+        "sourcetree beta",
+        "forklift",
+        "commander one",
+        "path finder",
+        "cyberduck",
+        "transmit",
+        "filezilla",
+        "keka",
+        "the unarchiver",
+        "onyx",
+        "stats",
+        "monitorcontrol",
+        "obsidian catalyst",
+        "localsend",
+        "airdroid",
+        "zoom workplace",
+        "webex",
+        "cisco webex",
+        "discord canary",
+        "signal",
+        "messages",
+        "imessage",
+        "phone",
+        "contacts",
+        "facetime",
+        "freeform",
+        "textedit",
+        "dictionary",
+        "calculator",
+        "clock",
+        "voice memos",
+        "photomator",
+        "homepage",
+        "home",
     ];
 
     let distraction_exact = [
         "spotify",
         "steam",
         "discord",
+        "games",
+        "chess",
         "telegram",
         "whatsapp",
         "whatsapp messenger",
         "messenger",
         "apple music",
         "music",
+        "podcasts",
         "tv",
         "apple tv",
         "netflix",
         "amazon prime video",
+        "youtube",
+        "youtube music",
         "vlc",
         "iina",
         "twitch",
@@ -1850,6 +2185,195 @@ fn classify_native_app_from_catalog(app_name: &str) -> Option<DomainClassificati
         "battle.net",
         "blizzard battle.net",
         "ea app",
+        "origin",
+        "ubisoft connect",
+        "gog galaxy",
+        "riot client",
+        "league of legends",
+        "valorant",
+        "minecraft",
+        "fortnite",
+        "roblox",
+        "rocket league",
+        "counter-strike 2",
+        "dota 2",
+        "apex legends",
+        "overwatch 2",
+        "world of warcraft",
+        "hearthstone",
+        "diablo iv",
+        "path of exile",
+        "genshin impact",
+        "honkai star rail",
+        "call of duty",
+        "warzone",
+        "xbox",
+        "xbox app",
+        "playstation remote play",
+        "nvidia geforce now",
+        "moonlight",
+        "parsec",
+        "facebook",
+        "instagram",
+        "threads",
+        "x",
+        "twitter",
+        "tiktok",
+        "snapchat",
+        "reddit",
+        "pinterest",
+        "tumblr",
+        "9gag",
+        "ifunny",
+        "discord canary",
+        "discord ptb",
+        "bilibili",
+        "kick",
+        "crunchyroll",
+        "disney+",
+        "hbo max",
+        "max",
+        "hulu",
+        "viaplay",
+        "canal+",
+        "prime video",
+        "apple podcasts",
+        "podcasts",
+        "tidal",
+        "deezer",
+        "soundcloud",
+        "bandcamp",
+        "yt music",
+        "opera gx",
+        "bluestacks",
+        "noxplayer",
+        "ppsspp",
+        "openemu",
+        "retroarch",
+        "citra",
+        "yuzu",
+        "ryujinx",
+        "mame",
+        "chisels and bits",
+        "battlefield",
+        "fifa",
+        "fc 24",
+        "nba 2k",
+        "grand theft auto v",
+        "gta v",
+        "gta online",
+        "cyberpunk 2077",
+        "elden ring",
+        "dark souls",
+        "sekiro",
+        "palworld",
+        "stardew valley",
+        "terraria",
+        "the sims 4",
+        "fall guys",
+        "among us",
+        "osu!",
+        "osu",
+        "geometry dash",
+        "brawlhalla",
+        "destiny 2",
+        "rainbow six siege",
+        "forza horizon 5",
+        "need for speed",
+        "world of tanks",
+        "war thunder",
+        "clash of clans",
+        "clash royale",
+        "hearts of iron iv",
+        "civilization vi",
+        "football manager",
+        "f1 24",
+        "tinder",
+        "bumble",
+        "hinge",
+        "okcupid",
+        "grindr",
+        "telegram desktop",
+        "viber",
+        "wechat",
+        "line",
+        "kik",
+        "beeper",
+        "messenger kids",
+        "capcut",
+        "reelshort",
+        "plex",
+        "infuse",
+        "kodi",
+        "stremio",
+        "letterboxd",
+        "tv time",
+        "duolingo",
+        "memrise",
+        "drops",
+        "strava",
+        "fitbod",
+        "nike run club",
+        "yazio",
+        "myfitnesspal",
+        "fantasy",
+        "fanduel",
+        "draftkings",
+        "bet365",
+        "betclic",
+        "sts",
+        "betfan",
+        "pyszne.pl",
+        "ubereats",
+        "doordash",
+        "glovo",
+        "wolt",
+        "aliexpress",
+        "temu",
+        "shein",
+        "amazon shopping",
+        "ebay",
+        "etsy",
+        "wish",
+        "vlive",
+        "weverse",
+        "steam chat",
+        "epic games",
+        "xbox cloud gaming",
+        "geforce now",
+        "moonlight game streaming",
+        "ps remote play",
+        "nintendo switch online",
+        "soundcloud desktop",
+        "tidal desktop",
+        "deezer desktop",
+        "opera gx stable",
+        "discord stable",
+        "reddit desktop",
+        "x desktop",
+        "instagram desktop",
+        "facebook desktop",
+        "tiktok live studio",
+        "kick desktop",
+        "twitch studio",
+        "chatroulette",
+        "omegle",
+        "ome tv",
+        "houseparty",
+        "snap camera",
+        "imvu",
+        "second life",
+        "vrchat",
+        "rec room",
+        "webtoon",
+        "mangaplus",
+        "crunchyroll desktop",
+        "hidive",
+        "funimation",
+        "disney plus",
+        "hbo go",
+        "player",
+        "canal plus online",
     ];
 
     let productive_contains = [
@@ -1869,10 +2393,296 @@ fn classify_native_app_from_catalog(app_name: &str) -> Option<DomainClassificati
         "jira",
         "postman",
         "docker",
+        "develop",
+        "developer",
+        "devtools",
+        "debug",
+        "database",
+        "sql",
+        "query",
+        "client",
+        "studio",
+        "workspace",
+        "work",
+        "kanban",
+        "project",
+        "task",
+        "ticket",
+        "planning",
+        "diagram",
+        "whiteboard",
+        "design",
+        "prototype",
+        "wireframe",
+        "research",
+        "writing",
+        "document",
+        "spreadsheet",
+        "slides",
+        "meeting",
+        "sync",
+        "remote",
+        "video call",
+        "calendar",
+        "reminder",
+        "focus",
+        "pomodoro",
+        "anki",
+        "zotero",
+        "devonthink",
+        "claude",
+        "chatgpt",
+        "openai",
+        "copilot",
+        "cursor",
+        "windsurf",
+        "xcode",
+        "android studio",
+        "intellij",
+        "pycharm",
+        "webstorm",
+        "goland",
+        "clion",
+        "datagrip",
+        "rider",
+        "rustrover",
+        "framer",
+        "miro",
+        "obsidian",
+        "notion",
+        "todoist",
+        "ticktick",
+        "things",
+        "productivity",
+        "workspace",
+        "office",
+        "suite",
+        "markdown",
+        "knowledge",
+        "brain",
+        "vault",
+        "journal",
+        "meeting notes",
+        "minutes",
+        "kanban",
+        "tracker",
+        "issue",
+        "bug",
+        "sprint",
+        "backlog",
+        "roadmap",
+        "planner",
+        "billing",
+        "invoice",
+        "finance",
+        "budget",
+        "accounting",
+        "bookkeeping",
+        "erp",
+        "crm",
+        "analytics",
+        "insight",
+        "dashboard",
+        "metrics",
+        "report",
+        "visualization",
+        "datasette",
+        "warehouse",
+        "airtable",
+        "coda",
+        "spreadsheet",
+        "sheet",
+        "presentation",
+        "slides",
+        "writer",
+        "docs",
+        "doc",
+        "pdf",
+        "scanner",
+        "capture",
+        "screen",
+        "screenshot",
+        "editorial",
+        "publishing",
+        "studio code",
+        "vscode",
+        "xcode",
+        "sdk",
+        "api",
+        "graphql",
+        "rest",
+        "mock",
+        "testing",
+        "tests",
+        "inspector",
+        "proxy",
+        "packet",
+        "monitor",
+        "watcher",
+        "script",
+        "automation",
+        "macro",
+        "shortcut",
+        "launcher",
+        "search",
+        "finder",
+        "explorer",
+        "database",
+        "postgres",
+        "mysql",
+        "sqlite",
+        "mongo",
+        "redis",
+        "ftp",
+        "sftp",
+        "ssh",
+        "remote desktop",
+        "vm",
+        "virtual machine",
+        "parallels",
+        "utm",
+        "vmware",
+        "calendar",
+        "mail client",
+        "contact",
+        "notes app",
+        "reader",
+        "research assistant",
+        "ai assistant",
     ];
 
     let distraction_contains = [
-        "game", "gaming", "launcher", "player", "music", "video", "stream", "social",
+        "game",
+        "gaming",
+        "launcher",
+        "player",
+        "music",
+        "video",
+        "stream",
+        "social",
+        "live",
+        "vod",
+        "reel",
+        "shorts",
+        "clip",
+        "meme",
+        "chat",
+        "dating",
+        "casino",
+        "bet",
+        "poker",
+        "slot",
+        "roulette",
+        "esports",
+        "fps",
+        "moba",
+        "rpg",
+        "mmorpg",
+        "battle",
+        "arcade",
+        "simulator",
+        "tycoon",
+        "anime",
+        "comic",
+        "manga",
+        "fandom",
+        "celebrity",
+        "gossip",
+        "shopping",
+        "deal",
+        "coupon",
+        "influencer",
+        "viral",
+        "watch",
+        "movie",
+        "series",
+        "tv",
+        "radio",
+        "podcast",
+        "playlist",
+        "remix",
+        "streamer",
+        "twitch",
+        "youtube",
+        "netflix",
+        "prime",
+        "discord",
+        "reddit",
+        "facebook",
+        "instagram",
+        "tiktok",
+        "twitter",
+        "x.com",
+        "casino",
+        "slots",
+        "gambling",
+        "betting",
+        "lottery",
+        "jackpot",
+        "pachinko",
+        "dating",
+        "match",
+        "swipe",
+        "hookup",
+        "chatroom",
+        "anonymous chat",
+        "meme",
+        "shitpost",
+        "viral",
+        "trend",
+        "influencer",
+        "celeb",
+        "gossip",
+        "fanpage",
+        "fandom",
+        "reaction",
+        "short video",
+        "livestream",
+        "live stream",
+        "vod",
+        "watch party",
+        "anime",
+        "manga",
+        "comic",
+        "webtoon",
+        "game pass",
+        "cloud gaming",
+        "remote play",
+        "arcade",
+        "fps",
+        "moba",
+        "battle royale",
+        "mmorpg",
+        "sandbox game",
+        "sim racing",
+        "football game",
+        "basketball game",
+        "racing game",
+        "stream deck",
+        "capture card",
+        "movie",
+        "series",
+        "cinema",
+        "episodes",
+        "podcast",
+        "playlist",
+        "song",
+        "karaoke",
+        "radio",
+        "shopping",
+        "marketplace",
+        "flash sale",
+        "coupon",
+        "deals",
+        "delivery",
+        "food",
+        "restaurant",
+        "takeaway",
+        "recipes",
+        "travel deals",
+        "hotels",
+        "flights",
+        "booking",
     ];
 
     if app_name_matches_exact(&normalized, &productive_exact) {
@@ -2122,6 +2932,10 @@ fn check_accessibility_permissions(prompt: bool) -> bool {
         return true;
     }
 
+    if !prompt {
+        return false;
+    }
+
     let value = unsafe {
         if prompt {
             kCFBooleanTrue
@@ -2160,11 +2974,9 @@ fn check_accessibility_permissions(_prompt: bool) -> bool {
 }
 
 fn has_runtime_tracking_permissions() -> bool {
-    if check_accessibility_permissions(false) {
-        return true;
-    }
-
-    read_frontmost_app_name().is_ok()
+    // Accessibility permission is mandatory for tracking.
+    // Do not fallback to Apple Events checks here.
+    check_accessibility_permissions(false)
 }
 
 fn open_accessibility_settings() {
@@ -2179,6 +2991,7 @@ fn open_accessibility_settings() {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::new())
         .setup(|app| {
@@ -2191,19 +3004,24 @@ pub fn run() {
             }
 
             let open_item =
-                MenuItem::with_id(app, "open", "Open Distraction Receipt", true, None::<&str>)?;
+                MenuItem::with_id(app, "open", "Otwórz aplikację", true, None::<&str>)?;
             let settings_item =
-                MenuItem::with_id(app, "settings", "Settings...", true, None::<&str>)?;
-            let separator = PredefinedMenuItem::separator(app)?;
-            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+                MenuItem::with_id(app, "settings", "Otwórz ustawienia", true, None::<&str>)?;
+            let weekly_item = MenuItem::with_id(
+                app,
+                "weekly",
+                "Otwórz historię tygodnia",
+                true,
+                None::<&str>,
+            )?;
 
-            let menu =
-                Menu::with_items(app, &[&open_item, &settings_item, &separator, &quit_item])?;
+            let menu = Menu::with_items(app, &[&open_item, &settings_item, &weekly_item])?;
 
             let _tray = TrayIconBuilder::with_id("tray")
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(tauri::include_image!("./icons/trayTemplate.png"))
+                .icon_as_template(true)
                 .menu(&menu)
-                .show_menu_on_left_click(false)
+                .show_menu_on_left_click(true)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "open" => {
                         if let Some(window) = app.get_webview_window("main") {
@@ -2218,28 +3036,14 @@ pub fn run() {
                             let _ = window.emit("navigate-to", "settings");
                         }
                     }
-                    "quit" => {
-                        app.exit(0);
-                    }
-                    _ => {}
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        let app = tray.app_handle();
+                    "weekly" => {
                         if let Some(window) = app.get_webview_window("main") {
-                            if window.is_visible().unwrap_or(false) {
-                                let _ = window.hide();
-                            } else {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                            let _ = window.emit("navigate-to", "weekly");
                         }
                     }
+                    _ => {}
                 })
                 .build(app)?;
 
@@ -2249,6 +3053,7 @@ pub fn run() {
                 activity_start_time: state.activity_start_time.clone(),
                 daily_stats: state.daily_stats.clone(),
                 settings: state.settings.clone(),
+                rest_days: state.rest_days.clone(),
                 alt_tab_count: state.alt_tab_count.clone(),
                 last_front_app: state.last_front_app.clone(),
                 data_dir: state.data_dir.clone(),

@@ -5,36 +5,36 @@
 			"path": "../../.."
 		},
 		{
-			"name": "distraction_receipt",
-			"path": "../../../../../Downloads/stitch_distraction_receipt/distraction_receipt"
+			"name": "fugit",
+			"path": "../../../../../Downloads/stitch_fugit/fugit"
 		},
 		{
 			"name": "onboarding_krok_1_nowa_sp_jno",
-			"path": "../../../../../Downloads/stitch_distraction_receipt/onboarding_krok_1_nowa_sp_jno"
+			"path": "../../../../../Downloads/stitch_fugit/onboarding_krok_1_nowa_sp_jno"
 		},
 		{
 			"name": "onboarding_krok_2_poprawiona_sp_jno",
-			"path": "../../../../../Downloads/stitch_distraction_receipt/onboarding_krok_2_poprawiona_sp_jno"
+			"path": "../../../../../Downloads/stitch_fugit/onboarding_krok_2_poprawiona_sp_jno"
 		},
 		{
 			"name": "onboarding_krok_3_nowa_sp_jno",
-			"path": "../../../../../Downloads/stitch_distraction_receipt/onboarding_krok_3_nowa_sp_jno"
+			"path": "../../../../../Downloads/stitch_fugit/onboarding_krok_3_nowa_sp_jno"
 		},
 		{
 			"name": "onboarding_krok_4_finalna_sp_jno",
-			"path": "../../../../../Downloads/stitch_distraction_receipt/onboarding_krok_4_finalna_sp_jno"
+			"path": "../../../../../Downloads/stitch_fugit/onboarding_krok_4_finalna_sp_jno"
 		},
 		{
 			"name": "poprawiony_rachunek_tygodniowy",
-			"path": "../../../../../Downloads/stitch_distraction_receipt/poprawiony_rachunek_tygodniowy"
+			"path": "../../../../../Downloads/stitch_fugit/poprawiony_rachunek_tygodniowy"
 		},
 		{
 			"name": "tw_j_paragon_dnia",
-			"path": "../../../../../Downloads/stitch_distraction_receipt/tw_j_paragon_dnia"
+			"path": "../../../../../Downloads/stitch_fugit/tw_j_paragon_dnia"
 		},
 		{
 			"name": "ustawienia_rozprosze_sp_jne",
-			"path": "../../../../../Downloads/stitch_distraction_receipt/ustawienia_rozprosze_sp_jne"
+			"path": "../../../../../Downloads/stitch_fugit/ustawienia_rozprosze_sp_jne"
 		}
 	],
 	"settings": {}

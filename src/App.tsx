@@ -16,7 +16,7 @@ type ScreenWindowPreset = {
   height: number
 }
 
-const ONBOARDING_COMPLETED_KEY = 'distraction-receipt:onboarding-completed'
+const ONBOARDING_COMPLETED_KEY = 'fugit:onboarding-completed'
 
 const screenWindowPresets: Record<Screen, ScreenWindowPreset> = {
   onboarding1: { width: 330, height: 680 },
@@ -35,7 +35,6 @@ interface DebugAppUsage {
 interface DebugDailyStats {
   date: string
   apps: DebugAppUsage[]
-  alt_tab_count: number
   last_updated: string
 }
 
@@ -47,7 +46,7 @@ interface DebugTrackingProbe {
 }
 
 /**
- * Distraction Receipt - Main App Component
+ * Fugit - Main App Component
  * 1:1 pixel-perfect design implementation
  * 360px max-width mobile app container with glassmorphism background
  */
@@ -369,9 +368,6 @@ export default function App() {
               </div>
               <div style={{ fontSize: 10, marginBottom: 4 }}>
                 Aktywne: {activeTrackedName || '—'}
-              </div>
-              <div style={{ fontSize: 10, marginBottom: 10 }}>
-                Alt-Tab: {betaStats?.alt_tab_count ?? 0}
               </div>
               <div style={{ fontSize: 10, marginBottom: 4 }}>
                 Accessibility: {betaProbe?.accessibility_permission ? 'OK' : 'NIE'}

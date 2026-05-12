@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Distraction Receipt",
+  "productName": "Fugit",
   "version": "0.1.0",
-  "identifier": "com.jannawrot.distraction-receipt",
+  "identifier": "com.jannawrot.fugit",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Distraction Receipt",
+        "title": "Fugit",
         "width": 330,
         "height": 680,
         "minWidth": 320,
@@ -32,13 +32,7 @@
     "security": {
       "csp": "default-src 'self'; connect-src 'self' http://localhost:1420; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;"
     },
-    "macOSPrivateApi": true,
-    "trayIcon": {
-      "id": "tray",
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": true,
-      "tooltip": "Distraction Receipt"
-    }
+    "macOSPrivateApi": true
   },
   "bundle": {
     "active": true,

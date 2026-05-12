@@ -53,7 +53,7 @@ export default function OnboardingCard({ onNext }: OnboardingCardProps) {
               textTransform: 'uppercase',
             }}
           >
-            WITAJ W DISTRACTION
+            WITAJ W FUGIT
             <br />CO.
           </h1>
         </div>

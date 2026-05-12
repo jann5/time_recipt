@@ -11,6 +11,7 @@ interface WeeklyDayHistory {
   day: string
   productivity: number
   streak: boolean
+  is_rest_day: boolean
 }
 
 interface WeeklyHistory {
@@ -28,13 +29,13 @@ const fallbackHistory: WeeklyHistory = {
   week_start: '',
   week_end: '',
   days: [
-    { date: '', day: 'Pon', productivity: 0, streak: false },
-    { date: '', day: 'Wt', productivity: 0, streak: false },
-    { date: '', day: 'Śr', productivity: 0, streak: false },
-    { date: '', day: 'Czw', productivity: 0, streak: false },
-    { date: '', day: 'Pt', productivity: 0, streak: false },
-    { date: '', day: 'Sob', productivity: 0, streak: false },
-    { date: '', day: 'Nd', productivity: 0, streak: false },
+    { date: '', day: 'Pon', productivity: 0, streak: false, is_rest_day: false },
+    { date: '', day: 'Wt', productivity: 0, streak: false, is_rest_day: false },
+    { date: '', day: 'Śr', productivity: 0, streak: false, is_rest_day: false },
+    { date: '', day: 'Czw', productivity: 0, streak: false, is_rest_day: false },
+    { date: '', day: 'Pt', productivity: 0, streak: false, is_rest_day: false },
+    { date: '', day: 'Sob', productivity: 0, streak: false, is_rest_day: false },
+    { date: '', day: 'Nd', productivity: 0, streak: false, is_rest_day: false },
   ],
   average_productivity: 0,
   best_day_label: '-',
@@ -61,19 +62,21 @@ function FlameIcon() {
 export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: WeeklyReceiptCardProps) {
   const [history, setHistory] = useState<WeeklyHistory>(fallbackHistory)
   const [loading, setLoading] = useState(true)
+  const [restDayBusyDate, setRestDayBusyDate] = useState<string | null>(null)
+  const [restDayError, setRestDayError] = useState('')
+
+  const fetchHistory = async () => {
+    try {
+      const data = await invoke<WeeklyHistory>('get_weekly_history')
+      setHistory(data)
+    } catch (error) {
+      console.error('Błąd pobierania historii:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const data = await invoke<WeeklyHistory>('get_weekly_history')
-        setHistory(data)
-      } catch (error) {
-        console.error('Błąd pobierania historii:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     void fetchHistory()
   }, [])
 
@@ -81,6 +84,26 @@ export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: Week
     () => (history.days.length > 0 ? history.days : fallbackHistory.days),
     [history.days],
   )
+
+  const restDayInWeek = weekData.find((day) => day.is_rest_day)
+
+  const toggleRestDay = async (day: WeeklyDayHistory) => {
+    if (!day.date || restDayBusyDate) {
+      return
+    }
+
+    setRestDayError('')
+    setRestDayBusyDate(day.date)
+    try {
+      await invoke('mark_day_off', { date: day.date })
+      await fetchHistory()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setRestDayError(message)
+    } finally {
+      setRestDayBusyDate(null)
+    }
+  }
 
   const bestDayText = history.best_day_label === '-' || history.best_day_productivity === 0
     ? '-'
@@ -148,7 +171,7 @@ export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: Week
               textTransform: 'uppercase',
             }}
           >
-            DISTRACTION CO.
+            FUGIT
           </div>
 
           <div style={{ width: 40, height: 1, background: '#1c1b1b', margin: '0 auto 16px' }} />
@@ -185,61 +208,113 @@ export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: Week
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {weekData.map((day, index) => (
-              <button
-                key={`${day.day}-${index}`}
-                type="button"
-                onClick={() => {
-                  if (day.date) {
-                    onOpenDayReceipt && onOpenDayReceipt(day.date)
-                  }
-                }}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '10px 0',
-                  border: 'none',
-                  background: 'none',
-                  textAlign: 'left',
-                  cursor: day.date ? 'pointer' : 'default',
-                  borderBottom: index < weekData.length - 1 ? '1px dashed #e8e8e8' : 'none',
-                }}
-                aria-label={day.date ? `Pokaż paragon z dnia ${day.date}` : `Dzień ${day.day}`}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, width: 32 }}>{day.day}</span>
-                  {day.streak && day.productivity > 0 && <FlameIcon />}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div
-                    style={{
-                      width: 100,
-                      height: 4,
-                      background: '#e8e8e8',
-                      borderRadius: 2,
-                      overflow: 'hidden',
+            {weekData.map((day, index) => {
+              const restTakenByOtherDay = Boolean(restDayInWeek && restDayInWeek.date !== day.date)
+              const canToggleRestDay = Boolean(day.date) && !restTakenByOtherDay && !restDayBusyDate
+              const isBusy = restDayBusyDate === day.date
+
+              return (
+                <div
+                  key={`${day.day}-${index}`}
+                  style={{
+                    padding: '10px 0',
+                    borderBottom: index < weekData.length - 1 ? '1px dashed #e8e8e8' : 'none',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (day.date) {
+                        onOpenDayReceipt && onOpenDayReceipt(day.date)
+                      }
                     }}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      border: 'none',
+                      background: 'none',
+                      textAlign: 'left',
+                      cursor: day.date ? 'pointer' : 'default',
+                      padding: 0,
+                    }}
+                    aria-label={day.date ? `Pokaż paragon z dnia ${day.date}` : `Dzień ${day.day}`}
                   >
-                    <div
-                      style={{
-                        width: `${day.productivity}%`,
-                        height: '100%',
-                        background: day.productivity >= 70 ? '#1c1b1b' : day.productivity >= 50 ? '#666' : '#999',
-                        borderRadius: 2,
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 11, width: 32 }}>{day.day}</span>
+                      {day.streak && day.productivity > 0 && <FlameIcon />}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      {day.is_rest_day ? (
+                        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em' }}>REST</span>
+                      ) : (
+                        <div
+                          style={{
+                            width: 100,
+                            height: 4,
+                            background: '#e8e8e8',
+                            borderRadius: 2,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: `${day.productivity}%`,
+                              height: '100%',
+                              background: day.productivity >= 70 ? '#1c1b1b' : day.productivity >= 50 ? '#666' : '#999',
+                              borderRadius: 2,
+                            }}
+                          />
+                        </div>
+                      )}
+                      <span style={{ fontSize: 11, fontWeight: 500, width: 36, textAlign: 'right' }}>
+                        {day.is_rest_day ? 'REST' : day.productivity > 0 ? `${day.productivity}%` : '-'}
+                      </span>
+                    </div>
+                  </button>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void toggleRestDay(day)
                       }}
-                    />
+                      disabled={!canToggleRestDay}
+                      style={{
+                        border: 'none',
+                        background: 'none',
+                        color: canToggleRestDay ? '#1c1b1b' : '#9a9893',
+                        cursor: canToggleRestDay ? 'pointer' : 'not-allowed',
+                        fontFamily: 'Courier Prime, monospace',
+                        fontSize: 9,
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                        textDecoration: canToggleRestDay ? 'underline' : 'none',
+                        textUnderlineOffset: '3px',
+                        padding: 0,
+                      }}
+                      aria-label={day.is_rest_day ? `Usuń Rest day dla ${day.day}` : `Ustaw Rest day dla ${day.day}`}
+                    >
+                      {isBusy ? 'Zapisywanie...' : day.is_rest_day ? 'Usuń Rest day' : 'Ustaw Rest day'}
+                    </button>
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 500, width: 36, textAlign: 'right' }}>
-                    {day.productivity > 0 ? `${day.productivity}%` : '-'}
-                  </span>
                 </div>
-              </button>
-            ))}
+              )
+            })}
           </div>
 
           <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px dashed #c4c4c4' }}>
+            {restDayInWeek && (
+              <div style={{ fontSize: 10, color: '#666', marginBottom: 10 }}>
+                Rest day: {restDayInWeek.day} ({restDayInWeek.date}) - wyłączony ze średniej
+              </div>
+            )}
+            {restDayError && (
+              <div style={{ fontSize: 10, color: '#8a3c3c', marginBottom: 10 }}>
+                {restDayError}
+              </div>
+            )}
             <div
               style={{
                 display: 'flex',

@@ -5,13 +5,24 @@ interface Onboarding2CardProps {
   onNext?: () => void
 }
 
+interface TrackingProbe {
+  accessibility_permission: boolean
+  can_read_frontmost_app: boolean
+  frontmost_app: string | null
+  error: string | null
+}
+
 export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
   const [status, setStatus] = useState<string>('')
   const [hasAccessibilityPermission, setHasAccessibilityPermission] = useState(false)
 
   const refreshPermissions = async () => {
     try {
-      const hasPermission = await invoke<boolean>('check_macos_permissions')
+      const [hasAccessibility, probe] = await Promise.all([
+        invoke<boolean>('check_macos_permissions'),
+        invoke<TrackingProbe>('get_tracking_probe'),
+      ])
+      const hasPermission = hasAccessibility && probe.accessibility_permission && probe.can_read_frontmost_app
       setHasAccessibilityPermission(hasPermission)
       setStatus((previous) => {
         if (hasPermission) {
@@ -56,9 +67,11 @@ export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
   const handleRequestPermissions = async () => {
     try {
       setStatus('Sprawdzam uprawnienia...')
-      const hasPermission = await invoke<boolean>('request_macos_permissions', {
+      const hasAccessibility = await invoke<boolean>('request_macos_permissions', {
         openSettings: true,
       })
+      const probe = await invoke<TrackingProbe>('get_tracking_probe')
+      const hasPermission = hasAccessibility && probe.accessibility_permission && probe.can_read_frontmost_app
       if (hasPermission) {
         setHasAccessibilityPermission(true)
         setStatus('Uprawnienia przyznane.')
@@ -76,6 +89,27 @@ export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
       console.error('Błąd:', error)
       setHasAccessibilityPermission(false)
       setStatus('Nie udało się sprawdzić uprawnień. Spróbuj ponownie.')
+    }
+  }
+
+  const handleNext = async () => {
+    try {
+      const [hasAccessibility, probe] = await Promise.all([
+        invoke<boolean>('check_macos_permissions'),
+        invoke<TrackingProbe>('get_tracking_probe'),
+      ])
+      const hasPermission = hasAccessibility && probe.accessibility_permission && probe.can_read_frontmost_app
+      setHasAccessibilityPermission(hasPermission)
+      if (hasPermission) {
+        setStatus('Uprawnienia przyznane.')
+        onNext && onNext()
+        return
+      }
+
+      setStatus('Najpierw przyznaj uprawnienia w Accessibility i wróć do aplikacji.')
+    } catch (error) {
+      console.error('Błąd:', error)
+      setStatus('Nie udało się zweryfikować uprawnień.')
     }
   }
 
@@ -201,7 +235,7 @@ export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
           </button>
 
           <button
-            onClick={() => onNext && onNext()}
+            onClick={handleNext}
             disabled={!hasAccessibilityPermission}
             style={{
               background: hasAccessibilityPermission ? '#1e1e1e' : '#ece8e2',

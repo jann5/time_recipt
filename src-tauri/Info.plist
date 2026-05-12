@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
   <key>NSAppleEventsUsageDescription</key>
-  <string>Distraction Receipt potrzebuje dostępu do aktywnych kart przeglądarki, aby poprawnie rozdzielać czas pracy i rozproszeń.</string>
+  <string>Fugit potrzebuje dostępu do aktywnych kart przeglądarki, aby poprawnie rozdzielać czas pracy i rozproszeń.</string>
 </dict>
 </plist>

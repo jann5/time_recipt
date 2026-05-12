@@ -1,4 +1,4 @@
-# Distraction Receipt 🧾
+# Fugit 🧾
 
 Aplikacja macOS menu bar do śledzenia czasu spędzonego w aplikacjach i wizualizacji produktywności w formie "paragonu".
 
@@ -8,7 +8,7 @@ Aplikacja macOS menu bar do śledzenia czasu spędzonego w aplikacjach i wizuali
 
 ## 📖 Opis
 
-Distraction Receipt to **nie jest kolejna aplikacja do produktywności**. To lustrzane odbicie Twojego czasu spędzonego przy komputerze - bez oceniania, bez presji, tylko czyste fakty w formacie, który znasz dobrze z każdego zakupu.
+Fugit to **nie jest kolejna aplikacja do produktywności**. To lustrzane odbicie Twojego czasu spędzonego przy komputerze - bez oceniania, bez presji, tylko czyste fakty w formacie, który znasz dobrze z każdego zakupu.
 
 Zamiast wykresów i dashboardów, dostajesz **wizualny paragon** - tak jak ze sklepu. To psychologicznie inny format: "Wydałem dziś 2.5h na YouTube" uderza inaczej niż słupek w analityce.
 
@@ -52,7 +52,7 @@ cargo --version
 ### Krok 2: Instalacja zależności projektu
 
 ```bash
-cd distraction-receipt
+cd fugit
 npm install
 ```
 
@@ -82,7 +82,7 @@ Aplikacja zostanie zbudowana w `src-tauri/target/release/bundle/`.
 ## 📁 Struktura projektu
 
 ```
-distraction-receipt/
+fugit/
 ├── src/                          # Frontend (React + TypeScript)
 │   ├── App.tsx                   # Główny komponent + routing
 │   ├── App.css                   # Style - Unified Design System
@@ -141,7 +141,7 @@ distraction-receipt/
 - Sprawdza co 5 sekund aktywną aplikację (via AppleScript)
 - Zapisuje czas w poszczególnych appkach
 - Liczy przełączania (alt-tab)
-- Wszystko lokalnie w `~/Library/Application Support/com.jannawrot.distraction-receipt/`
+- Wszystko lokalnie w `~/Library/Application Support/com.jannawrot.fugit/`
 
 ### 2. Dzienny paragon
 - Główna metryka: % wydajności

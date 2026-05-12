@@ -634,7 +634,7 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
               textTransform: 'uppercase',
             }}
           >
-            DISTRACTION CO.
+            FUGIT
           </div>
 
           <div style={{ width: 40, height: 1, background: '#1c1b1b', margin: '0 auto 16px' }} />

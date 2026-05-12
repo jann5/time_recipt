@@ -11,8 +11,8 @@ const MAPPING = {
   'ustawienia_rozprosze_sp_jne/code.html': 'Settings'
 };
 
-const dlPath = '/Users/jannawrot/Downloads/stitch_distraction_receipt/';
-const screensPath = '/Users/jannawrot/PROJEKTY_WEB/time_recipt/distraction-receipt/src/screens/';
+const dlPath = '/Users/jannawrot/Downloads/stitch_fugit/';
+const screensPath = '/Users/jannawrot/PROJEKTY_WEB/time_recipt/src/screens/';
 
 function convertHtmlToReact(html, componentName) {
   // Extract content between <div class="relative z-10... and </body>
