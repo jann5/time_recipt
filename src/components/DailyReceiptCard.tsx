@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { save as openSaveDialog } from '@tauri-apps/plugin-dialog'
@@ -8,6 +8,8 @@ interface AppUsage {
   name: string
   time_seconds: number
   activity_kind?: 'app' | 'browser_tab'
+  browser_name?: string
+  browser_host?: string
 }
 
 interface DailyReport {
@@ -113,6 +115,8 @@ export default function DailyReceiptCard({
   const [loading, setLoading] = useState(true)
   const [isSavingReceiptImage, setIsSavingReceiptImage] = useState(false)
   const [saveImageState, setSaveImageState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [classifyingEntryKey, setClassifyingEntryKey] = useState<string | null>(null)
+  const [classificationError, setClassificationError] = useState('')
   const [readyReceiptError, setReadyReceiptError] = useState('')
   const isHistoricalReport = Boolean(reportDate)
   const isReadyForConfirmation = Boolean(
@@ -121,36 +125,26 @@ export default function DailyReceiptCard({
       && reportDate === readyForConfirmationDate,
   )
 
-  useEffect(() => {
-    let disposed = false
-
-    const fetchReport = async () => {
-      try {
-        const data = await invoke<DailyReport>(
-          reportDate ? 'get_daily_report_for_date' : 'get_daily_report',
-          reportDate ? { date: reportDate } : undefined,
-        )
-        if (!disposed) {
-          setReport(data)
-        }
-      } catch (error) {
-        if (!disposed) {
-          console.error('Błąd pobierania raportu:', error)
-        }
-      } finally {
-        if (!disposed) {
-          setLoading(false)
-        }
-      }
+  const fetchReport = useCallback(async () => {
+    try {
+      const data = await invoke<DailyReport>(
+        reportDate ? 'get_daily_report_for_date' : 'get_daily_report',
+        reportDate ? { date: reportDate } : undefined,
+      )
+      setReport(data)
+    } catch (error) {
+      console.error('Błąd pobierania raportu:', error)
+    } finally {
+      setLoading(false)
     }
+  }, [reportDate])
 
+  useEffect(() => {
     setLoading(true)
     void fetchReport()
 
     if (reportDate) {
-      return () => {
-        disposed = true
-      }
+      return
     }
 
     const interval = window.setInterval(() => {
@@ -161,13 +155,47 @@ export default function DailyReceiptCard({
     })
 
     return () => {
-      disposed = true
       clearInterval(interval)
       void unlistenPromise.then((unlisten) => {
         unlisten()
       })
     }
-  }, [reportDate])
+  }, [fetchReport, reportDate])
+
+  const getEntryKey = (entry: AppUsage): string => {
+    const kind = entry.activity_kind ?? 'app'
+    const browserName = entry.browser_name ?? ''
+    const browserHost = entry.browser_host ?? ''
+    return `${kind}|${entry.name}|${browserName}|${browserHost}`
+  }
+
+  const handleSetManualCategory = async (
+    entry: AppUsage,
+    category: 'productive' | 'distraction',
+  ) => {
+    const key = getEntryKey(entry)
+    if (classifyingEntryKey) {
+      return
+    }
+
+    setClassifyingEntryKey(key)
+    setClassificationError('')
+    try {
+      await invoke('set_manual_entry_category', {
+        entryName: entry.name,
+        activityKind: entry.activity_kind ?? 'app',
+        category,
+        browserHost: entry.browser_host ?? null,
+        browserName: entry.browser_name ?? null,
+      })
+      await fetchReport()
+    } catch (error) {
+      console.error('Błąd zapisu klasyfikacji:', error)
+      setClassificationError('Nie udało się zapisać klasyfikacji. Spróbuj ponownie.')
+    } finally {
+      setClassifyingEntryKey(null)
+    }
+  }
 
   const captureReceiptAsPngDataUrl = async (): Promise<string> => {
     const receiptElement = receiptCaptureRef.current
@@ -691,9 +719,57 @@ export default function DailyReceiptCard({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {sortedNeutral.length > 0 ? (
               sortedNeutral.map((app, index) => (
-                <div key={index} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, alignItems: 'center' }}>
+                <div
+                  key={index}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr auto',
+                    columnGap: 10,
+                    rowGap: 6,
+                    fontSize: 11,
+                    alignItems: 'center',
+                  }}
+                >
                   <span style={{ letterSpacing: '0.02em' }}>{app.name}</span>
                   <span style={{ fontWeight: 500 }}>{formatTime(app.time_seconds)}</span>
+
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => void handleSetManualCategory(app, 'productive')}
+                      disabled={classifyingEntryKey !== null}
+                      style={{
+                        border: '1px solid #ccc',
+                        background: '#fff',
+                        padding: '2px 6px',
+                        borderRadius: 3,
+                        cursor: classifyingEntryKey ? 'default' : 'pointer',
+                        fontSize: 9,
+                        fontFamily: 'Courier Prime, monospace',
+                        color: '#1c1b1b',
+                        opacity: classifyingEntryKey === getEntryKey(app) ? 0.6 : 1,
+                      }}
+                    >
+                      Produktywna
+                    </button>
+
+                    <button
+                      onClick={() => void handleSetManualCategory(app, 'distraction')}
+                      disabled={classifyingEntryKey !== null}
+                      style={{
+                        border: '1px solid #ccc',
+                        background: '#fff',
+                        padding: '2px 6px',
+                        borderRadius: 3,
+                        cursor: classifyingEntryKey ? 'default' : 'pointer',
+                        fontSize: 9,
+                        fontFamily: 'Courier Prime, monospace',
+                        color: '#1c1b1b',
+                        opacity: classifyingEntryKey === getEntryKey(app) ? 0.6 : 1,
+                      }}
+                    >
+                      Rozpraszająca
+                    </button>
+                  </div>
                 </div>
               ))
             ) : (
@@ -702,6 +778,12 @@ export default function DailyReceiptCard({
               </div>
             )}
           </div>
+
+          {classificationError && (
+            <div style={{ marginTop: 10, fontSize: 10, color: '#8a3c3c' }}>
+              {classificationError}
+            </div>
+          )}
         </div>
 
         <div style={{ borderTop: '1px dashed #c4c4c4', marginBottom: 28 }} />

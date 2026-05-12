@@ -14,8 +14,6 @@ use tauri::{Emitter, LogicalSize, Manager, State};
 use tokio::sync::Mutex;
 use url::Url;
 
-const MIN_REPORT_ENTRY_SECONDS: u64 = 5 * 60;
-
 #[cfg(target_os = "macos")]
 use core_foundation_sys::base::{kCFAllocatorDefault, CFRelease};
 #[cfg(target_os = "macos")]
@@ -62,6 +60,13 @@ pub enum DomainCategory {
     Productive,
     Distraction,
     Neutral,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ManualCategory {
+    Productive,
+    Distraction,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -462,7 +467,10 @@ fn build_daily_report_from_stats(stats: DailyStats, settings: &UserSettings) -> 
     sorted_apps.sort_by(|a, b| b.time_seconds.cmp(&a.time_seconds));
 
     for app in sorted_apps {
-        if app.time_seconds < MIN_REPORT_ENTRY_SECONDS {
+        if app.time_seconds == 0 {
+            continue;
+        }
+        if app.activity_kind == ActivityKind::App && is_ignored_tracker_app(&app.name) {
             continue;
         }
 
@@ -648,6 +656,7 @@ async fn get_app_insights(state: State<'_, AppState>) -> Result<AppInsights, Str
 
             let app_name = usage.name.trim();
             if app_name.is_empty()
+                || is_ignored_tracker_app(app_name)
                 || is_helper_or_updater_app(app_name)
                 || is_browser_shell_app(app_name)
                 || is_web_only_pseudo_app(app_name)
@@ -705,6 +714,63 @@ async fn update_settings(
     {
         let mut settings = state.settings.lock().await;
         *settings = normalized;
+    }
+
+    state.save_settings().await
+}
+
+#[tauri::command]
+async fn set_manual_entry_category(
+    entry_name: String,
+    activity_kind: ActivityKind,
+    category: ManualCategory,
+    browser_host: Option<String>,
+    browser_name: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let trimmed_name = entry_name.trim();
+    if trimmed_name.is_empty() {
+        return Err("entry_name cannot be empty".to_string());
+    }
+
+    {
+        let mut settings = state.settings.lock().await;
+        match activity_kind {
+            ActivityKind::BrowserTab => {
+                let fallback_host = {
+                    let candidate = trimmed_name.trim().to_lowercase();
+                    if candidate.contains('.') {
+                        Some(candidate)
+                    } else {
+                        None
+                    }
+                };
+
+                let host = browser_host
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(|value| value.to_string())
+                    .or(fallback_host)
+                    .ok_or_else(|| "browser_host is required for browser_tab".to_string())?;
+
+                apply_manual_category_for_domain(
+                    &mut settings,
+                    &host,
+                    trimmed_name,
+                    browser_name.as_deref(),
+                    category,
+                );
+            }
+            ActivityKind::App => {
+                if is_ignored_tracker_app(trimmed_name) {
+                    return Err("cannot classify internal app".to_string());
+                }
+                apply_manual_category_for_app(&mut settings, trimmed_name, category);
+            }
+        }
+
+        *settings = normalize_settings(std::mem::take(&mut *settings));
     }
 
     state.save_settings().await
@@ -1207,6 +1273,31 @@ async fn tracking_loop(state: Arc<AppState>, app_handle: tauri::AppHandle) {
         let Some(active_window) = get_active_window() else {
             continue;
         };
+        if is_ignored_tracker_app(&active_window.app_name) {
+            let mut current_activity = state.current_activity.lock().await;
+            let mut activity_start_time = state.activity_start_time.lock().await;
+            let mut stats = state.daily_stats.lock().await;
+
+            if let (Some(previous), Some(start_time)) =
+                (current_activity.clone(), *activity_start_time)
+            {
+                let elapsed = start_time.elapsed().as_secs();
+                if elapsed > 0 {
+                    upsert_app_usage(&mut stats.apps, &previous, elapsed);
+                    stats.last_updated = Local::now().to_rfc3339();
+                }
+            }
+
+            *current_activity = None;
+            *activity_start_time = None;
+
+            drop(stats);
+            drop(activity_start_time);
+            drop(current_activity);
+
+            let _ = state.save_daily_stats().await;
+            continue;
+        }
 
         let settings = state.settings.lock().await.clone();
         let context = build_activity_context(&active_window, &settings);
@@ -1349,6 +1440,17 @@ fn is_browser_application(app_name: &str) -> bool {
     matches!(
         app_name,
         "Google Chrome" | "Brave Browser" | "Safari" | "Firefox" | "Arc" | "Microsoft Edge"
+    )
+}
+
+fn is_ignored_tracker_app(app_name: &str) -> bool {
+    matches!(
+        app_name.trim().to_lowercase().as_str(),
+        "fugit"
+            | "fugit.app"
+            | "distraction receipt"
+            | "distraction receipt.app"
+            | "distraction-receipt"
     )
 }
 
@@ -1505,6 +1607,96 @@ fn contains_case_insensitive(collection: &[String], value: &str) -> bool {
     collection
         .iter()
         .any(|item| item.trim().to_lowercase() == key)
+}
+
+fn manual_to_browser_category(category: ManualCategory) -> BrowserCategory {
+    match category {
+        ManualCategory::Productive => BrowserCategory::Productive,
+        ManualCategory::Distraction => BrowserCategory::Distraction,
+    }
+}
+
+fn apply_manual_category_for_app(settings: &mut UserSettings, app_name: &str, category: ManualCategory) {
+    let app_key = app_name.trim().to_lowercase();
+    if app_key.is_empty() {
+        return;
+    }
+
+    settings
+        .work_apps
+        .retain(|entry| entry.trim().to_lowercase() != app_key);
+    settings
+        .distraction_apps
+        .retain(|entry| entry.trim().to_lowercase() != app_key);
+
+    match category {
+        ManualCategory::Productive => settings.work_apps.push(app_name.trim().to_string()),
+        ManualCategory::Distraction => settings.distraction_apps.push(app_name.trim().to_string()),
+    }
+}
+
+fn apply_manual_category_for_domain(
+    settings: &mut UserSettings,
+    host: &str,
+    label: &str,
+    browser_name: Option<&str>,
+    category: ManualCategory,
+) {
+    let mut pattern = host
+        .trim()
+        .to_lowercase()
+        .replace("https://", "")
+        .replace("http://", "");
+    pattern = pattern.split('/').next().unwrap_or_default().to_string();
+    pattern = pattern.split('?').next().unwrap_or_default().to_string();
+    pattern = pattern.split('#').next().unwrap_or_default().to_string();
+    if let Some(without_www) = pattern.strip_prefix("www.") {
+        pattern = without_www.to_string();
+    }
+
+    if pattern.is_empty() {
+        return;
+    }
+
+    let normalized_browser = browser_name
+        .map(normalize_browser_name)
+        .filter(|name| !name.is_empty());
+
+    let category = manual_to_browser_category(category);
+    let label_value = if label.trim().is_empty() {
+        format_host_label(&pattern)
+    } else {
+        label.trim().to_string()
+    };
+
+    let existing_index = settings.browser_rules.iter().position(|rule| {
+        if rule.pattern.trim().to_lowercase() != pattern {
+            return false;
+        }
+
+        match &normalized_browser {
+            Some(browser_key) => rule.browsers.iter().any(|entry| entry == browser_key),
+            None => rule.browsers.is_empty(),
+        }
+    });
+
+    let browsers = match normalized_browser {
+        Some(browser_key) => vec![browser_key],
+        None => Vec::new(),
+    };
+
+    if let Some(index) = existing_index {
+        settings.browser_rules[index].label = label_value;
+        settings.browser_rules[index].category = category;
+        settings.browser_rules[index].browsers = browsers;
+    } else {
+        settings.browser_rules.push(BrowserRule {
+            pattern,
+            label: label_value,
+            category,
+            browsers,
+        });
+    }
 }
 
 fn is_daily_stats_path(path: &Path) -> bool {
@@ -2846,6 +3038,9 @@ fn calculate_day_split(stats: &DailyStats, settings: &UserSettings) -> (u64, u64
     let mut distraction = 0_u64;
 
     for app in &stats.apps {
+        if app.activity_kind == ActivityKind::App && is_ignored_tracker_app(&app.name) {
+            continue;
+        }
         match classify_usage(app, settings) {
             UsageBucket::Productive => productive += app.time_seconds,
             UsageBucket::Distraction => distraction += app.time_seconds,
@@ -3072,6 +3267,7 @@ pub fn run() {
             get_browser_insights,
             get_app_insights,
             update_settings,
+            set_manual_entry_category,
             add_distraction_app,
             remove_distraction_app,
             get_all_stats,
