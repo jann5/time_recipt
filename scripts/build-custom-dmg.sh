@@ -4,6 +4,13 @@ set -euo pipefail
 APP_NAME="Fugit"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TARGET_TRIPLE="${1:-universal-apple-darwin}"
+if [[ "$TARGET_TRIPLE" == "native" ]]; then
+  if [[ "$(uname -m)" == "arm64" ]]; then
+    TARGET_TRIPLE="aarch64-apple-darwin"
+  else
+    TARGET_TRIPLE="x86_64-apple-darwin"
+  fi
+fi
 TARGET_RELEASE_DIR="$ROOT_DIR/src-tauri/target/$TARGET_TRIPLE/release"
 APP_BUNDLE_DIR="$TARGET_RELEASE_DIR/bundle/macos"
 APP_PATH="$APP_BUNDLE_DIR/$APP_NAME.app"

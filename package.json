@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "build:dmg": "bash scripts/build-custom-dmg.sh",
-    "build:dmg:native": "bash scripts/build-custom-dmg.sh aarch64-apple-darwin"
+    "build:dmg:native": "bash scripts/build-custom-dmg.sh native"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.0",
