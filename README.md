@@ -6,6 +6,12 @@ Aplikacja macOS menu bar do śledzenia czasu spędzonego w aplikacjach i wizuali
 ![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
+<p align="center">
+  <a href="https://github.com/jann5/time_recipt/releases/latest/download/Fugit.dmg">
+    <img src="https://img.shields.io/badge/DOWNLOAD%20FUGIT%20FOR%20MACOS-111827?style=for-the-badge&logo=apple&logoColor=white" alt="Download Fugit for macOS" />
+  </a>
+</p>
+
 ## 📖 Opis
 
 Fugit to **nie jest kolejna aplikacja do produktywności**. To lustrzane odbicie Twojego czasu spędzonego przy komputerze - bez oceniania, bez presji, tylko czyste fakty w formacie, który znasz dobrze z każdego zakupu.
