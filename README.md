@@ -8,7 +8,7 @@ Aplikacja macOS menu bar do śledzenia czasu spędzonego w aplikacjach i wizuali
 
 <p align="center">
   <a href="https://raw.githubusercontent.com/jann5/time_recipt/main/downloads/Fugit.dmg" download>
-    <img src="https://img.shields.io/badge/DOWNLOAD%20FUGIT%20FOR%20MACOS-111827?style=for-the-badge&logo=apple&logoColor=white" alt="Download Fugit for macOS" />
+    <img src="https://img.shields.io/badge/DOWNLOAD%20FUGIT%20(INTEL%20%2B%20APPLE%20SILICON)-111827?style=for-the-badge&logo=apple&logoColor=white" alt="Download Fugit for macOS (Intel + Apple Silicon)" />
   </a>
 </p>
 
