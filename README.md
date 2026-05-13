@@ -7,7 +7,7 @@ Aplikacja macOS menu bar do śledzenia czasu spędzonego w aplikacjach i wizuali
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/jann5/time_recipt/main/downloads/Fugit.dmg" download>
+  <a href="https://raw.githubusercontent.com/jann5/time_recipt/main/downloads/Fugit.zip" download>
     <img src="https://img.shields.io/badge/DOWNLOAD%20FUGIT%20(INTEL%20%2B%20APPLE%20SILICON)-111827?style=for-the-badge&logo=apple&logoColor=white" alt="Download Fugit for macOS (Intel + Apple Silicon)" />
   </a>
 </p>
@@ -83,16 +83,24 @@ npm run tauri build
 
 Aplikacja zostanie zbudowana w `src-tauri/target/release/bundle/`.
 
-### Krok 5: Build instalatora DMG
+### Krok 5: Build paczki ZIP (Intel + Apple Silicon)
 
 Local/dev (do testów na własnym Macu):
 ```bash
-npm run build:dmg:native
-# albo universal lokalnie:
-npm run build:dmg:local
+npm run build:zip:native
+# albo universal:
+npm run build:zip
 ```
 
-Release na GitHub (Intel + Apple Silicon, bez komunikatu malware):
+Skrypt ZIP:
+- buduje `.app` (domyślnie universal),
+- podpisuje ad-hoc,
+- czyści `xattr` (`xattr -cr`) na `.app`,
+- pakuje do `downloads/Fugit.zip`.
+
+### Krok 6: Build release DMG (Developer ID + notarization Apple)
+
+To jedyna metoda, żeby maksymalnie ograniczyć komunikaty Gatekeeper u innych użytkowników:
 ```bash
 export APPLE_SIGN_IDENTITY="Developer ID Application: Twoje Imie (TEAMID)"
 export APPLE_NOTARY_PROFILE="fugit-notary"

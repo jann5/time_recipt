@@ -8,6 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "build:zip": "bash scripts/build-custom-zip.sh universal-apple-darwin",
+    "build:zip:native": "bash scripts/build-custom-zip.sh native",
     "build:dmg": "bash scripts/build-custom-dmg.sh universal-apple-darwin release",
     "build:dmg:local": "bash scripts/build-custom-dmg.sh universal-apple-darwin local",
     "build:dmg:native": "bash scripts/build-custom-dmg.sh native local"
