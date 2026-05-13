@@ -1031,17 +1031,17 @@ async fn save_receipt_as_image(
 
 #[tauri::command]
 async fn request_macos_permissions(open_settings: Option<bool>) -> Result<bool, String> {
-    let trusted_before = has_runtime_tracking_permissions();
+    let trusted_before = check_accessibility_permissions(false);
     if open_settings.unwrap_or(false) || !trusted_before {
         let _ = check_accessibility_permissions(true);
         open_accessibility_settings();
     }
-    Ok(has_runtime_tracking_permissions())
+    Ok(check_accessibility_permissions(false))
 }
 
 #[tauri::command]
 async fn check_macos_permissions() -> Result<bool, String> {
-    Ok(has_runtime_tracking_permissions())
+    Ok(check_accessibility_permissions(false))
 }
 
 #[tauri::command]
@@ -1089,7 +1089,7 @@ fn read_frontmost_app_name() -> Result<String, String> {
 
 #[tauri::command]
 async fn get_tracking_probe() -> Result<TrackingProbe, String> {
-    let accessibility_permission = has_runtime_tracking_permissions();
+    let accessibility_permission = check_accessibility_permissions(false);
     if !accessibility_permission {
         return Ok(TrackingProbe {
             accessibility_permission,
