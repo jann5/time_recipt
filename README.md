@@ -83,6 +83,26 @@ npm run tauri build
 
 Aplikacja zostanie zbudowana w `src-tauri/target/release/bundle/`.
 
+### Krok 5: Build instalatora DMG
+
+Local/dev (do testów na własnym Macu):
+```bash
+npm run build:dmg:native
+# albo universal lokalnie:
+npm run build:dmg:local
+```
+
+Release na GitHub (Intel + Apple Silicon, bez komunikatu malware):
+```bash
+export APPLE_SIGN_IDENTITY="Developer ID Application: Twoje Imie (TEAMID)"
+export APPLE_NOTARY_PROFILE="fugit-notary"
+npm run build:dmg
+```
+
+`npm run build:dmg` wymaga podpisu Developer ID i notaryzacji Apple.
+Po sukcesie dopiero kopiuje gotowy plik do `downloads/Fugit.dmg`.
+Jeśli nie ma tych danych, build zatrzyma się błędem (zamiast produkować paczkę blokowaną przez Gatekeeper).
+
 ---
 
 ## 📁 Struktura projektu

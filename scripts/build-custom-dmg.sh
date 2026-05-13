@@ -3,13 +3,20 @@ set -euo pipefail
 
 APP_NAME="Fugit"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-TARGET_TRIPLE="${1:-universal-apple-darwin}"
+TARGET_INPUT="${1:-universal-apple-darwin}"
+BUILD_MODE="${2:-release}"
+TARGET_TRIPLE="$TARGET_INPUT"
 if [[ "$TARGET_TRIPLE" == "native" ]]; then
   if [[ "$(uname -m)" == "arm64" ]]; then
     TARGET_TRIPLE="aarch64-apple-darwin"
   else
     TARGET_TRIPLE="x86_64-apple-darwin"
   fi
+fi
+if [[ "$BUILD_MODE" != "release" && "$BUILD_MODE" != "local" ]]; then
+  echo "Invalid build mode: $BUILD_MODE"
+  echo "Use one of: release, local"
+  exit 1
 fi
 TARGET_RELEASE_DIR="$ROOT_DIR/src-tauri/target/$TARGET_TRIPLE/release"
 APP_BUNDLE_DIR="$TARGET_RELEASE_DIR/bundle/macos"
@@ -19,6 +26,12 @@ DMG_OUT_PATH="$DMG_OUT_DIR/$APP_NAME.dmg"
 BG_PATH="$ROOT_DIR/src-tauri/dmg/background.png"
 DOWNLOADS_DIR="$ROOT_DIR/downloads"
 DOWNLOADS_DMG_PATH="$DOWNLOADS_DIR/$APP_NAME.dmg"
+SIGN_IDENTITY="${APPLE_SIGN_IDENTITY:-}"
+ENTITLEMENTS_PATH="$ROOT_DIR/src-tauri/Entitlements.plist"
+NOTARY_PROFILE="${APPLE_NOTARY_PROFILE:-}"
+APPLE_ID="${APPLE_ID:-}"
+APPLE_APP_SPECIFIC_PASSWORD="${APPLE_APP_SPECIFIC_PASSWORD:-}"
+APPLE_TEAM_ID="${APPLE_TEAM_ID:-}"
 
 cd "$ROOT_DIR"
 
@@ -37,7 +50,16 @@ if [[ "$TARGET_TRIPLE" == "universal-apple-darwin" ]]; then
   rustup target add aarch64-apple-darwin x86_64-apple-darwin >/dev/null
 fi
 
-echo "1/4 Building macOS app bundle ($TARGET_TRIPLE)..."
+if [[ "$BUILD_MODE" == "release" ]]; then
+  if [[ -z "$SIGN_IDENTITY" ]]; then
+    echo "Missing APPLE_SIGN_IDENTITY for release build."
+    echo "Example:"
+    echo '  export APPLE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"'
+    exit 1
+  fi
+fi
+
+echo "1/6 Building macOS app bundle ($TARGET_TRIPLE)..."
 npm run tauri build -- --target "$TARGET_TRIPLE" --bundles app
 
 if [[ ! -d "$APP_PATH" ]]; then
@@ -45,10 +67,19 @@ if [[ ! -d "$APP_PATH" ]]; then
   exit 1
 fi
 
-echo "2/4 Generating DMG background..."
+echo "2/6 Signing app bundle..."
+if [[ "$BUILD_MODE" == "release" ]]; then
+  codesign --force --deep --timestamp --options runtime --entitlements "$ENTITLEMENTS_PATH" --sign "$SIGN_IDENTITY" "$APP_PATH"
+else
+  echo "Local mode: ad-hoc signing (not suitable for public distribution)."
+  codesign --force --deep --sign - "$APP_PATH"
+fi
+codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+
+echo "3/6 Generating DMG background..."
 swift "$ROOT_DIR/scripts/generate-dmg-background.swift"
 
-echo "3/4 Building custom DMG..."
+echo "4/6 Building custom DMG..."
 mkdir -p "$DMG_OUT_DIR"
 rm -f "$DMG_OUT_PATH"
 rm -f "$APP_BUNDLE_DIR"/rw.*.dmg || true
@@ -76,9 +107,37 @@ create-dmg \
 
 rm -f "$APP_BUNDLE_DIR"/rw.*.dmg || true
 
-echo "4/4 Syncing DMG to downloads..."
-mkdir -p "$DOWNLOADS_DIR"
-cp "$DMG_OUT_PATH" "$DOWNLOADS_DMG_PATH"
+echo "5/6 Signing DMG..."
+if [[ "$BUILD_MODE" == "release" ]]; then
+  codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DMG_OUT_PATH"
+else
+  codesign --force --sign - "$DMG_OUT_PATH" >/dev/null 2>&1 || true
+fi
+
+if [[ "$BUILD_MODE" == "release" ]]; then
+  if [[ -n "$NOTARY_PROFILE" ]]; then
+    xcrun notarytool submit "$DMG_OUT_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
+  elif [[ -n "$APPLE_ID" && -n "$APPLE_APP_SPECIFIC_PASSWORD" && -n "$APPLE_TEAM_ID" ]]; then
+    xcrun notarytool submit "$DMG_OUT_PATH" --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+  else
+    echo "Missing notarization credentials."
+    echo "Set APPLE_NOTARY_PROFILE or APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID."
+    exit 1
+  fi
+  xcrun stapler staple "$APP_PATH"
+  xcrun stapler staple "$DMG_OUT_PATH"
+  spctl --assess --type execute -vv "$APP_PATH"
+  spctl --assess --type open --context context:primary-signature -vv "$DMG_OUT_PATH"
+fi
+
+echo "6/6 Finalizing output..."
+if [[ "$BUILD_MODE" == "release" ]]; then
+  mkdir -p "$DOWNLOADS_DIR"
+  cp "$DMG_OUT_PATH" "$DOWNLOADS_DMG_PATH"
+  echo "Ready for GitHub: $DOWNLOADS_DMG_PATH"
+else
+  echo "Local build kept at: $DMG_OUT_PATH"
+  echo "Skipping copy to downloads/ in local mode to avoid publishing unsigned DMG."
+fi
 
 echo "Done: $DMG_OUT_PATH"
-echo "Ready for GitHub: $DOWNLOADS_DMG_PATH"
