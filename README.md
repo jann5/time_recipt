@@ -1,6 +1,6 @@
-# Fugit 🧾
+# Fugit
 
-Aplikacja macOS menu bar do śledzenia czasu spędzonego w aplikacjach i wizualizacji produktywności w formie "paragonu".
+Fugit to lekka aplikacja menu bar na macOS, która śledzi czas spędzony w aplikacjach i pokazuje dzień w formie czytelnego „paragonu produktywności”.
 
 ![Version](https://img.shields.io/badge/version-0.1.0-green)
 ![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)
@@ -12,255 +12,133 @@ Aplikacja macOS menu bar do śledzenia czasu spędzonego w aplikacjach i wizuali
   </a>
 </p>
 
-## 📖 Opis
+<p align="center">
+  <img src="https://img.shields.io/badge/WA%C5%BBNE-macOS%20mo%C5%BCe%20zablokowa%C4%87%20pierwsze%20uruchomienie%20aplikacji-C2410C?style=for-the-badge&labelColor=111827" alt="Ważne: macOS może zablokować pierwsze uruchomienie aplikacji" />
+</p>
 
-Fugit to **nie jest kolejna aplikacja do produktywności**. To lustrzane odbicie Twojego czasu spędzonego przy komputerze - bez oceniania, bez presji, tylko czyste fakty w formacie, który znasz dobrze z każdego zakupu.
+<p align="center"><strong>Jeśli pojawi się blokada uruchomienia:</strong><br/>
+System Settings → Privacy &amp; Security → przewiń na dół → <strong>"Fugit was blocked"</strong> → <strong>Open Anyway</strong>.
+</p>
 
-Zamiast wykresów i dashboardów, dostajesz **wizualny paragon** - tak jak ze sklepu. To psychologicznie inny format: "Wydałem dziś 2.5h na YouTube" uderza inaczej niż słupek w analityce.
+## Co robi Fugit
 
-### Kluczowe cechy:
+- Śledzi aktywną aplikację i czas pracy w interwałach 5 s.
+- Rozdziela aktywność na kategorie: produktywne, rozpraszające i neutralne.
+- Pokazuje dzienny raport w formie „paragonu”.
+- Buduje tygodniowe podsumowanie trendu.
+- Działa lokalnie, bez konta i bez synchronizacji do chmury.
 
-- 🔒 **100% prywatności** - dane lokalne, żadnej chmury
-- 👁️ **Ciche śledzenie** - działa w tle, nie przeszkadza
-- 🧾 **Format paragonu** - znajomy, bolesny w odbiorze
-- 📊 **Statystyki tygodniowe** - trend i średnia wydajność
-- ⚙️ **Konfigurowalne** - Ty decydujesz co jest rozproszeniem
-- 🔥 **Streaki** - motywacja przez ciągłość
+## Wymagania i kompatybilność
 
----
+- macOS `10.15+`
+- Architektura: `Intel (x86_64)` i `Apple Silicon (arm64)`
+- Ventura (`13.x`) jest wspierana
 
-## 🚀 Instalacja i uruchomienie
+## Szybki start dla użytkownika
 
-### Wymagania systemowe
+1. Pobierz `Fugit.zip` z przycisku powyżej.
+2. Rozpakuj archiwum.
+3. Przenieś `Fugit.app` do `/Applications`.
+4. Uruchom aplikację.
+5. Przy pierwszym starcie nadaj wymagane uprawnienia (Accessibility / System Events).
 
-- **macOS** 10.15 lub nowszy
-- **Node.js** 18+ (sprawdź: `node --version`)
-- **npm** 9+ (sprawdź: `npm --version`)
-- **Rust** (instalacja poniżej)
+## Prywatność
 
-### Krok 1: Instalacja Rust
+Fugit zapisuje dane tylko lokalnie, domyślnie w:
+
+`~/Library/Application Support/com.jannawrot.fugit/`
+
+Przykładowe pliki:
+
+- `settings.json`
+- `YYYY-MM-DD.json` (statystyki dzienne)
+- `rest_days.json`
+
+## Troubleshooting macOS (Gatekeeper)
+
+Jeśli macOS zablokuje aplikację po pobraniu z internetu:
+
+1. Spróbuj uruchomić ponownie z Finder: PPM na `Fugit.app` → `Open`.
+2. Jeśli dalej blokuje, użyj: System Settings → Privacy & Security → `Open Anyway`.
+3. Wersja produkcyjna bez ostrzeżeń dla większości użytkowników wymaga podpisu Developer ID i notarization Apple.
+
+## Uruchomienie lokalne (deweloperskie)
+
+### Wymagania
+
+- Node.js `18+`
+- npm `9+`
+- Rust (rustup)
+
+Instalacja zależności i start:
 
 ```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-Po instalacji uruchom ponownie terminal lub:
-```bash
-source ~/.cargo/env
-```
-
-Sprawdź instalację:
-```bash
-rustc --version
-cargo --version
-```
-
-### Krok 2: Instalacja zależności projektu
-
-```bash
-cd fugit
 npm install
-```
-
-### Krok 3: Uruchomienie w trybie deweloperskim
-
-```bash
 npm run tauri dev
 ```
 
-To polecenie:
-1. Uruchomi frontend dev server (Vite)
-2. Skompiluje backend Rust
-3. Otworzy aplikację jako menu bar app
+## Buildy i paczki
 
-**Pierwsze uruchomienie** może potrwać 2-5 minut (kompilacja Rust).
-
-### Krok 4: Build produkcyjny
+### Build aplikacji
 
 ```bash
 npm run tauri build
 ```
 
-Aplikacja zostanie zbudowana w `src-tauri/target/release/bundle/`.
+### ZIP (dystrybucja szybka)
 
-### Krok 5: Build paczki ZIP (Intel + Apple Silicon)
-
-Local/dev (do testów na własnym Macu):
 ```bash
-npm run build:zip:native
-# albo universal:
+# universal (Intel + Apple Silicon)
 npm run build:zip
+
+# natywny dla hosta
+npm run build:zip:native
 ```
 
 Skrypt ZIP:
-- buduje `.app` (domyślnie universal),
+
+- buduje `.app`,
 - podpisuje ad-hoc,
-- czyści `xattr` (`xattr -cr`) na `.app`,
+- czyści atrybuty `xattr` na `.app`,
 - pakuje do `downloads/Fugit.zip`.
 
-### Krok 6: Build release DMG (Developer ID + notarization Apple)
+### DMG release (podpis + notarization Apple)
 
-To jedyna metoda, żeby maksymalnie ograniczyć komunikaty Gatekeeper u innych użytkowników:
+To ścieżka produkcyjna do publicznej dystrybucji.
+
 ```bash
 export APPLE_SIGN_IDENTITY="Developer ID Application: Twoje Imie (TEAMID)"
 export APPLE_NOTARY_PROFILE="fugit-notary"
 npm run build:dmg
 ```
 
-`npm run build:dmg` wymaga podpisu Developer ID i notaryzacji Apple.
-Po sukcesie dopiero kopiuje gotowy plik do `downloads/Fugit.dmg`.
-Jeśli nie ma tych danych, build zatrzyma się błędem (zamiast produkować paczkę blokowaną przez Gatekeeper).
+Alternatywnie do notaryzacji można użyć:
 
----
+- `APPLE_ID`
+- `APPLE_APP_SPECIFIC_PASSWORD`
+- `APPLE_TEAM_ID`
 
-## 📁 Struktura projektu
+Po udanym release skrypt kopiuje plik do `downloads/Fugit.dmg`.
 
-```
-fugit/
-├── src/                          # Frontend (React + TypeScript)
-│   ├── App.tsx                   # Główny komponent + routing
-│   ├── App.css                   # Style - Unified Design System
-│   ├── main.tsx                  # Entry point React
-│   ├── components/               # Reusable komponenty
-│   │   ├── ReceiptHeader.tsx     # Nagłówek paragonu
-│   │   └── AppList.tsx           # Lista aplikacji
-│   ├── screens/                  # Ekrany aplikacji
-│   │   ├── DailyReceipt.tsx      # Dzienny paragon
-│   │   ├── WeeklySummary.tsx     # Podsumowanie tygodnia
-│   │   ├── Settings.tsx          # Ustawienia
-│   │   └── Onboarding.tsx        # Onboarding 4-krokowy
-│   ├── hooks/
-│   │   └── useTracking.ts        # Hook do danych Tauri
-│   └── types/
-│       └── index.ts              # TypeScript interfaces
-│
-├── src-tauri/                    # Backend (Rust)
-│   ├── src/
-│   │   └── lib.rs                # Główna logika + śledzenie
-│   ├── Cargo.toml                # Zależności Rust
-│   ├── tauri.conf.json           # Konfiguracja Tauri
-│   └── Entitlements.plist        # Uprawnienia macOS
-│
-├── package.json                  # Zależności npm
-├── tsconfig.json                 # Konfiguracja TypeScript
-└── vite.config.ts                # Konfiguracja Vite
+## Struktura repo
+
+```text
+time_recipt/
+├── src/                 # frontend React + TypeScript
+├── src-tauri/           # backend Rust + konfiguracja Tauri
+├── downloads/           # artefakty publikowane na GitHub
+├── scripts/             # skrypty build/release
+└── README.md
 ```
 
----
+## Stack
 
-## 🛠 Technologie
+- React 19
+- TypeScript
+- Vite
+- Rust
+- Tauri 2
 
-### Frontend
-- **React 19** - UI library
-- **TypeScript** - typowanie
-- **Vite** - build tool
-- **CSS Variables** - design system
+## Licencja
 
-### Backend
-- **Rust** - systemowy język programowania
-- **Tauri 2.0** - framework desktop (zamiast Electron)
-- **AppleScript** - śledzenie aktywnych okien na macOS
-- **Tokio** - async runtime
-
-### Darmowy i open-source
-- **Zero zależności płatnych**
-- **Brak subskrypcji**
-- **Brak kont użytkowników**
-
----
-
-## 🎯 Funkcjonalności
-
-### 1. Śledzenie aktywności
-- Sprawdza co 5 sekund aktywną aplikację (via AppleScript)
-- Zapisuje czas w poszczególnych appkach
-- Liczy przełączania (alt-tab)
-- Wszystko lokalnie w `~/Library/Application Support/com.jannawrot.fugit/`
-
-### 2. Dzienny paragon
-- Główna metryka: % wydajności
-- Lista aplikacji rozpraszających (z ikonami)
-- Lista aplikacji produktywnych
-- Streak dni z dobrymi wynikami
-- Quote motywacyjny
-
-### 3. Tygodniowe podsumowanie
-- Średnia wydajność tygodniowa
-- Słupkowy wykres 7 dni
-- Trend (rosnący/spadkowy/stabilny)
-- Liczba aktywnych dni
-
-### 4. Ustawienia
-- Dodawanie/usuwanie aplikacji rozpraszających
-- Lista domyślnych aplikacji produktywnych
-- Godzina raportu (domyślnie 22:00)
-- Włączanie/wyłączanie powiadomień
-- Wyczyść wszystkie dane
-
-### 5. Menu Bar
-- Ikona w pasku menu macOS
-- Kliknięcie lewym: pokaż/ukryj okno
-- Menu prawym: Open / Settings / Quit
-
----
-
-## 🔮 Rozwój w przyszłości
-
-### Funkcje do dodania:
-
-#### Wysoki priorytet
-- [ ] **Eksport PNG** - zapis paragonu jako obrazek do udostępniania
-- [ ] **Pełna logika streaków** - zapisywanie historii streaków
-- [ ] **Powiadomienia natywne** - macOS notifications o 22:00
-- [ ] **Tryb "nie oceniaj"** - oznaczanie dni jako wolnych
-
-#### Średni priorytet
-- [ ] **Detekcja stron www** - YouTube w Safari vs dokumentacja
-- [ ] **Kategorie niestandardowe** - nie tylko praca/rozproszenia
-- [ ] **Porównania** - wczoraj vs dziś, średnia tygodniowa
-- [ ] **Cele dzienne** - ustawianie targetów produktywności
-
-#### Niski priorytet
-- [ ] **Wersja iOS** - śledzenie na iPhone (Tauri mobile)
-- [ ] **Widget macOS** - w Notification Center
-- [ ] **Skróty klawiszowe** - szybkie oznaczanie aktywności
-- [ ] **Integracja z Calendar** - blokowanie czasu focus
-
-### Refactoring techniczny:
-
-```rust
-// TODO: Zmienić AppleScript na CoreGraphics API
-// dla lepszej wydajności i więcej danych (np. tytuły okien)
-
-// TODO: Dodać SQLite zamiast JSON dla lepszej skalowalności
-
-// TODO: Implementacja prawdziwego systemu pluginów
-// dla niestandardowych kategorii aplikacji
-```
-
----
-
-## 🐛 Znane problemy
-
-1. **AppleScript wymaga uprawnień** - przy pierwszym uruchomieniu macOS może pytać o dostęp do System Events
-2. **Nie śledzi tytułów okien** - tylko nazwy aplikacji (ograniczenie AppleScript)
-3. **Brak eksportu PNG** - obecnie tylko placeholder
-
----
-
-## 📄 Licencja
-
-MIT License - do wolnego użytku, modyfikacji i dystrybucji.
-
----
-
-## 🤝 Wsparcie
-
-Jeśli masz pomysły lub znajdziesz błąd:
-1. Sprawdź czy masz zainstalowane wszystkie wymagania
-2. Uruchom z flagą debug: `npm run tauri dev -- --verbose`
-3. Zgłoś issue na GitHub
-
----
-
-**Stworzone z myślą o świadomej pracy przy komputerze. Bez przemocy produktywnościowej.** 🧘‍♂️
+MIT
