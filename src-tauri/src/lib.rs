@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{Emitter, LogicalSize, Manager, State};
+use tauri::{Emitter, LogicalSize, Manager, State, WindowEvent};
 use tokio::sync::Mutex;
 use url::Url;
 
@@ -108,6 +108,8 @@ pub struct UserSettings {
     pub browser_rules: Vec<BrowserRule>,
     pub daily_report_time: String,
     pub notifications_enabled: bool,
+    #[serde(default = "default_language")]
+    pub language: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -217,7 +219,19 @@ impl Default for UserSettings {
             browser_rules: default_browser_rules(),
             daily_report_time: "22:00".to_string(),
             notifications_enabled: true,
+            language: default_language(),
         }
+    }
+}
+
+fn default_language() -> String {
+    "pl".to_string()
+}
+
+fn normalize_language(language: &str) -> String {
+    match language.trim().to_lowercase().as_str() {
+        "en" => "en".to_string(),
+        _ => "pl".to_string(),
     }
 }
 
@@ -541,6 +555,16 @@ async fn get_daily_report_for_date(
 #[tauri::command]
 async fn get_settings(state: State<'_, AppState>) -> Result<UserSettings, String> {
     Ok(state.settings.lock().await.clone())
+}
+
+#[tauri::command]
+async fn set_language(language: String, state: State<'_, AppState>) -> Result<(), String> {
+    {
+        let mut settings = state.settings.lock().await;
+        settings.language = normalize_language(&language);
+    }
+
+    state.save_settings().await
 }
 
 #[tauri::command]
@@ -1592,6 +1616,7 @@ fn normalize_settings(settings: UserSettings) -> UserSettings {
     } else {
         "22:00".to_string()
     };
+    let language = normalize_language(&settings.language);
 
     UserSettings {
         distraction_apps,
@@ -1599,6 +1624,7 @@ fn normalize_settings(settings: UserSettings) -> UserSettings {
         browser_rules,
         daily_report_time,
         notifications_enabled: settings.notifications_enabled,
+        language,
     }
 }
 
@@ -3183,6 +3209,14 @@ fn open_accessibility_settings() {
     }
 }
 
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -3198,19 +3232,47 @@ pub fn run() {
                 let _ = window.center();
             }
 
-            let open_item =
-                MenuItem::with_id(app, "open", "Otwórz aplikację", true, None::<&str>)?;
-            let settings_item =
-                MenuItem::with_id(app, "settings", "Otwórz ustawienia", true, None::<&str>)?;
-            let weekly_item = MenuItem::with_id(
-                app,
-                "weekly",
-                "Otwórz historię tygodnia",
-                true,
-                None::<&str>,
-            )?;
+            let language = {
+                let state: State<AppState> = app.state();
+                state
+                    .settings
+                    .try_lock()
+                    .map(|settings| normalize_language(&settings.language))
+                    .unwrap_or_else(|_| default_language())
+            };
+            let is_english = language == "en";
 
-            let menu = Menu::with_items(app, &[&open_item, &settings_item, &weekly_item])?;
+            let open_item =
+                MenuItem::with_id(
+                    app,
+                    "open",
+                    if is_english {
+                        "Open app"
+                    } else {
+                        "Otwórz aplikację"
+                    },
+                    true,
+                    None::<&str>,
+                )?;
+            let settings_item =
+                MenuItem::with_id(
+                    app,
+                    "settings",
+                    if is_english {
+                        "Open settings"
+                    } else {
+                        "Otwórz ustawienia"
+                    },
+                    true,
+                    None::<&str>,
+                )?;
+            let quit_item =
+                MenuItem::with_id(app, "quit", if is_english { "Quit app" } else { "Zamknij aplikację" }, true, None::<&str>)?;
+
+            let menu = Menu::with_items(
+                app,
+                &[&open_item, &settings_item, &quit_item],
+            )?;
 
             let _tray = TrayIconBuilder::with_id("tray")
                 .icon(tauri::include_image!("./icons/trayTemplate.png"))
@@ -3219,24 +3281,16 @@ pub fn run() {
                 .show_menu_on_left_click(true)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "open" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
+                        show_main_window(app);
                     }
                     "settings" => {
+                        show_main_window(app);
                         if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
                             let _ = window.emit("navigate-to", "settings");
                         }
                     }
-                    "weekly" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                            let _ = window.emit("navigate-to", "weekly");
-                        }
+                    "quit" => {
+                        app.exit(0);
                     }
                     _ => {}
                 })
@@ -3264,6 +3318,7 @@ pub fn run() {
             get_daily_report,
             get_daily_report_for_date,
             get_settings,
+            set_language,
             get_browser_insights,
             get_app_insights,
             update_settings,
@@ -3279,6 +3334,17 @@ pub fn run() {
             request_macos_permissions,
             save_receipt_as_image,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
+            }
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::Reopen { .. } = event {
+                show_main_window(app);
+            }
+        });
 }

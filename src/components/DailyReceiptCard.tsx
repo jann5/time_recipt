@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { save as openSaveDialog } from '@tauri-apps/plugin-dialog'
 import html2canvas from 'html2canvas'
+import { type AppLanguage, localeForLanguage } from '../i18n'
 
 interface AppUsage {
   name: string
@@ -28,6 +29,7 @@ interface DailyReceiptCardProps {
   reportDate?: string
   readyForConfirmationDate?: string
   onConfirmReadyReceipt?: () => void
+  language: AppLanguage
 }
 
 function formatTime(seconds: number): string {
@@ -63,13 +65,19 @@ const RECEIPT_EXPORT_HEIGHT = 1800
 const RECEIPT_EXPORT_PADDING = 52
 const SHORT_ENTRY_THRESHOLD_SECONDS = 5 * 60
 
+interface AggregatedEntriesResult {
+  entries: AppUsage[]
+  scoredSeconds: number
+}
+
 function aggregateShortEntries(
   entries: AppUsage[],
   labels: { otherAppsLabel: string; otherTabsLabel: string },
-): AppUsage[] {
+): AggregatedEntriesResult {
   let shortAppsSeconds = 0
   let shortTabsSeconds = 0
   const regularEntries: AppUsage[] = []
+  let scoredSeconds = 0
 
   for (const entry of entries) {
     if (entry.time_seconds < SHORT_ENTRY_THRESHOLD_SECONDS) {
@@ -82,25 +90,31 @@ function aggregateShortEntries(
     }
 
     regularEntries.push(entry)
+    scoredSeconds += entry.time_seconds
   }
 
-  if (shortAppsSeconds > 0) {
+  if (shortAppsSeconds >= SHORT_ENTRY_THRESHOLD_SECONDS) {
     regularEntries.push({
       name: labels.otherAppsLabel,
       time_seconds: shortAppsSeconds,
       activity_kind: 'app',
     })
+    scoredSeconds += shortAppsSeconds
   }
 
-  if (shortTabsSeconds > 0) {
+  if (shortTabsSeconds >= SHORT_ENTRY_THRESHOLD_SECONDS) {
     regularEntries.push({
       name: labels.otherTabsLabel,
       time_seconds: shortTabsSeconds,
       activity_kind: 'browser_tab',
     })
+    scoredSeconds += shortTabsSeconds
   }
 
-  return regularEntries.sort((a, b) => b.time_seconds - a.time_seconds)
+  return {
+    entries: regularEntries.sort((a, b) => b.time_seconds - a.time_seconds),
+    scoredSeconds,
+  }
 }
 
 export default function DailyReceiptCard({
@@ -108,13 +122,62 @@ export default function DailyReceiptCard({
   reportDate,
   readyForConfirmationDate,
   onConfirmReadyReceipt,
+  language,
 }: DailyReceiptCardProps) {
+  const isEnglish = language === 'en'
+  const copy = {
+    loading: isEnglish ? 'Loading...' : 'Ładowanie...',
+    settingsAria: isEnglish ? 'Settings' : 'Ustawienia',
+    historyAria: isEnglish ? 'History' : 'Historia',
+    title: isEnglish ? 'YOUR DAILY REPORT' : 'TWÓJ CODZIENNY RAPORT',
+    oldReceiptTitle: isEnglish ? 'ARCHIVED RECEIPT' : 'STARY PARAGON',
+    readyReceiptInfo: isEnglish
+      ? 'This receipt is ready to close. Saving image is optional.'
+      : 'Paragon jest gotowy do zamknięcia. Zapis obrazu jest opcjonalny.',
+    archiveInfo: isEnglish
+      ? "This is an archived report. Today's receipt is still being generated."
+      : 'To archiwalny raport. Dzisiejszy paragon nadal się tworzy.',
+    confirmReady: isEnglish ? 'CONFIRM AND CONTINUE' : 'ZATWIERDŹ I PRZEJDŹ DALEJ',
+    saveOptional: isEnglish
+      ? 'SAVE AS IMAGE (OPTIONAL)'
+      : 'ZAPISZ JAKO OBRAZ (OPCJONALNIE)',
+    savingImage: isEnglish ? 'SAVING IMAGE...' : 'ZAPISYWANIE OBRAZU...',
+    backToday: isEnglish ? "Back to today's receipt" : 'Wróć do dzisiejszego paragonu',
+    distractionHeader: isEnglish ? 'DISTRACTIONS' : 'ROZPROSZENIA',
+    workHeader: isEnglish ? 'WORK' : 'PRACA',
+    otherHeader: isEnglish ? 'OTHER' : 'INNE',
+    emptyDistractions: isEnglish ? 'No distractions today' : 'Brak rozpraszaczy dzisiaj',
+    emptyWork: isEnglish ? 'No work entries today' : 'Brak pracy dzisiaj',
+    emptyOther: isEnglish ? 'No other entries today' : 'Brak innych pozycji dzisiaj',
+    totalDistraction: isEnglish ? 'Total distraction time' : 'Łączny czas rozproszeń',
+    totalWork: isEnglish ? 'Total work time' : 'Łączny czas pracy',
+    dayPerformance: isEnglish ? 'DAY PERFORMANCE' : 'WYDAJNOŚĆ DNIA',
+    trackingSince: isEnglish ? 'Tracking active for' : 'Śledzenie aktywne od',
+    startWorking: isEnglish ? 'Start working to see stats' : 'Zacznij pracować, a zobaczysz statystyki',
+    saveButtonIdle: isEnglish ? 'Save image' : 'Zapisz obraz',
+    saveButtonSaving: isEnglish ? 'Saving...' : 'Zapisywanie...',
+    saveButtonSaved: isEnglish ? 'Saved ✓' : 'Zapisano ✓',
+    saveButtonError: isEnglish ? 'Save failed' : 'Błąd zapisu',
+    savedIn: isEnglish ? 'Saved to:' : 'Zapisano w:',
+    saveDialogTitle: isEnglish ? 'Save report image' : 'Zapisz obraz paragonu',
+    saveErrorMessage: isEnglish ? 'Could not save image.' : 'Nie udało się zapisać obrazu.',
+    saveErrorTryAgain: isEnglish ? 'Could not save image. Try again.' : 'Nie udało się zapisać obrazu. Spróbuj ponownie.',
+    classifyError: isEnglish ? 'Could not save classification. Try again.' : 'Nie udało się zapisać klasyfikacji. Spróbuj ponownie.',
+    prodShort: isEnglish ? 'PROD' : 'PROD',
+    nonProdShort: isEnglish ? 'NON-PROD' : 'NIEPROD',
+    otherProductiveApps: isEnglish ? 'Other productive apps' : 'Inne produktywne aplikacje',
+    otherProductiveTabs: isEnglish ? 'Other productive tabs' : 'Inne produktywne karty',
+    otherDistractionApps: isEnglish ? 'Other distracting apps' : 'Inne nieproduktywne aplikacje',
+    otherDistractionTabs: isEnglish ? 'Other distracting tabs' : 'Inne nieproduktywne karty',
+  }
+
   const receiptCaptureRef = useRef<HTMLDivElement | null>(null)
   const saveFeedbackTimerRef = useRef<number | null>(null)
   const [report, setReport] = useState<DailyReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [isSavingReceiptImage, setIsSavingReceiptImage] = useState(false)
   const [saveImageState, setSaveImageState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [saveImageDetails, setSaveImageDetails] = useState('')
   const [classifyingEntryKey, setClassifyingEntryKey] = useState<string | null>(null)
   const [classificationError, setClassificationError] = useState('')
   const [readyReceiptError, setReadyReceiptError] = useState('')
@@ -191,7 +254,7 @@ export default function DailyReceiptCard({
       await fetchReport()
     } catch (error) {
       console.error('Błąd zapisu klasyfikacji:', error)
-      setClassificationError('Nie udało się zapisać klasyfikacji. Spróbuj ponownie.')
+      setClassificationError(copy.classifyError)
     } finally {
       setClassifyingEntryKey(null)
     }
@@ -271,6 +334,7 @@ export default function DailyReceiptCard({
     }
     saveFeedbackTimerRef.current = window.setTimeout(() => {
       setSaveImageState('idle')
+      setSaveImageDetails('')
       saveFeedbackTimerRef.current = null
     }, delayMs)
   }
@@ -278,6 +342,7 @@ export default function DailyReceiptCard({
   const handleSaveImage = async (showAlerts = true): Promise<boolean> => {
     setIsSavingReceiptImage(true)
     setSaveImageState('saving')
+    setSaveImageDetails('')
     if (!showAlerts) {
       setReadyReceiptError('')
     }
@@ -285,9 +350,11 @@ export default function DailyReceiptCard({
     try {
       const imageDataUrl = await captureReceiptAsPngDataUrl()
       const targetDate = report?.date ?? reportDate ?? new Date().toISOString().slice(0, 10)
-      const defaultFilename = `fugit_raport_${targetDate}.png`
+      const defaultFilename = isEnglish
+        ? `fugit_report_${targetDate}.png`
+        : `fugit_raport_${targetDate}.png`
       const selectedPath = await openSaveDialog({
-        title: 'Zapisz obraz paragonu',
+        title: copy.saveDialogTitle,
         defaultPath: defaultFilename,
         canCreateDirectories: true,
         filters: [
@@ -300,6 +367,7 @@ export default function DailyReceiptCard({
 
       if (!selectedPath) {
         setSaveImageState('idle')
+        setSaveImageDetails('')
         return false
       }
 
@@ -310,14 +378,16 @@ export default function DailyReceiptCard({
       })
       console.log('Zapisano obraz:', path)
       setSaveImageState('saved')
+      setSaveImageDetails(path)
       scheduleSaveFeedbackReset(1800)
       return true
     } catch (error) {
       console.error('Błąd zapisywania:', error)
       setSaveImageState('error')
+      setSaveImageDetails(copy.saveErrorMessage)
       scheduleSaveFeedbackReset(2500)
       if (!showAlerts) {
-        setReadyReceiptError('Nie udało się zapisać obrazu. Spróbuj ponownie.')
+        setReadyReceiptError(copy.saveErrorTryAgain)
       }
       return false
     } finally {
@@ -357,29 +427,36 @@ export default function DailyReceiptCard({
   const totalNeutral = report?.total_neutral_seconds ?? 0
   const totalTime = totalProductive + totalDistraction + totalNeutral
 
-  const productivity = totalTime > 0
-    ? Math.round((totalProductive / totalTime) * 100)
+  const productiveAggregation = aggregateShortEntries(productiveApps, {
+    otherAppsLabel: copy.otherProductiveApps,
+    otherTabsLabel: copy.otherProductiveTabs,
+  })
+  const distractionAggregation = aggregateShortEntries(distractionApps, {
+    otherAppsLabel: copy.otherDistractionApps,
+    otherTabsLabel: copy.otherDistractionTabs,
+  })
+  const sortedProductive = productiveAggregation.entries
+  const sortedDistraction = distractionAggregation.entries
+  const sortedNeutral = neutralApps
+    .filter((app) => app.time_seconds >= SHORT_ENTRY_THRESHOLD_SECONDS)
+    .sort((a, b) => b.time_seconds - a.time_seconds)
+  const visibleProductiveSeconds = productiveAggregation.scoredSeconds
+  const visibleDistractionSeconds = distractionAggregation.scoredSeconds
+
+  const scoredTime = visibleProductiveSeconds + visibleDistractionSeconds
+  const productivity = scoredTime > 0
+    ? Math.round((visibleProductiveSeconds / scoredTime) * 100)
     : 0
 
-  const sortedProductive = aggregateShortEntries(productiveApps, {
-    otherAppsLabel: 'Inne produktywne aplikacje',
-    otherTabsLabel: 'Inne produktywne karty',
-  })
-  const sortedDistraction = aggregateShortEntries(distractionApps, {
-    otherAppsLabel: 'Inne nieproduktywne aplikacje',
-    otherTabsLabel: 'Inne nieproduktywne karty',
-  })
-  const sortedNeutral = [...neutralApps].sort((a, b) => b.time_seconds - a.time_seconds)
-
   const today = report?.date
-    ? new Date(report.date).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    : new Date().toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    ? new Date(report.date).toLocaleDateString(localeForLanguage(language), { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : new Date().toLocaleDateString(localeForLanguage(language), { day: '2-digit', month: '2-digit', year: 'numeric' })
 
   if (loading) {
     return (
       <div className="h-full w-full flex items-center justify-center">
         <div style={{ fontFamily: 'Courier Prime, monospace', color: '#666' }}>
-          Ładowanie...
+          {copy.loading}
         </div>
       </div>
     )
@@ -432,7 +509,7 @@ export default function DailyReceiptCard({
             onMouseLeave={(event) => {
               event.currentTarget.style.opacity = '0.6'
             }}
-            aria-label="Ustawienia"
+            aria-label={copy.settingsAria}
           >
             <SettingsIcon />
           </button>
@@ -456,7 +533,7 @@ export default function DailyReceiptCard({
             onMouseLeave={(event) => {
               event.currentTarget.style.opacity = '0.6'
             }}
-            aria-label="Historia"
+            aria-label={copy.historyAria}
           >
             <HistoryIcon />
           </button>
@@ -486,7 +563,7 @@ export default function DailyReceiptCard({
               textTransform: 'uppercase',
             }}
           >
-            TWÓJ CODZIENNY RAPORT
+            {copy.title}
           </h1>
           <div style={{ fontSize: 10, color: '#666', letterSpacing: '0.1em' }}>
             {today} · {report?.daily_report_time || '22:00'}
@@ -511,7 +588,7 @@ export default function DailyReceiptCard({
                 textTransform: 'uppercase',
               }}
             >
-              STARY PARAGON
+              {copy.oldReceiptTitle}
             </div>
             <div
               style={{
@@ -523,8 +600,8 @@ export default function DailyReceiptCard({
               }}
             >
               {isReadyForConfirmation
-                ? 'Paragon jest gotowy do zamknięcia. Zapis obrazu jest opcjonalny.'
-                : 'To archiwalny raport. Dzisiejszy paragon nadal się tworzy.'}
+                ? copy.readyReceiptInfo
+                : copy.archiveInfo}
             </div>
             {isReadyForConfirmation ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
@@ -545,7 +622,7 @@ export default function DailyReceiptCard({
                     opacity: isSavingReceiptImage ? 0.85 : 1,
                   }}
                 >
-                  ZATWIERDŹ I PRZEJDŹ DALEJ
+                  {copy.confirmReady}
                 </button>
                 <button
                   onClick={() => {
@@ -566,7 +643,7 @@ export default function DailyReceiptCard({
                     opacity: isSavingReceiptImage ? 0.6 : 0.85,
                   }}
                 >
-                  {isSavingReceiptImage ? 'ZAPISYWANIE OBRAZU...' : 'ZAPISZ JAKO OBRAZ (OPCJONALNIE)'}
+                  {isSavingReceiptImage ? copy.savingImage : copy.saveOptional}
                 </button>
                 {readyReceiptError && (
                   <div
@@ -596,7 +673,7 @@ export default function DailyReceiptCard({
                   padding: 0,
                 }}
               >
-                Wróć do dzisiejszego paragonu
+                {copy.backToday}
               </button>
             )}
           </div>
@@ -615,7 +692,7 @@ export default function DailyReceiptCard({
               color: '#1c1b1b',
             }}
           >
-            ROZPROSZENIA
+            {copy.distractionHeader}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -628,7 +705,7 @@ export default function DailyReceiptCard({
               ))
             ) : (
               <div style={{ fontSize: 11, color: '#888', fontStyle: 'italic' }}>
-                Brak rozpraszaczy dzisiaj
+                {copy.emptyDistractions}
               </div>
             )}
           </div>
@@ -646,8 +723,8 @@ export default function DailyReceiptCard({
               textTransform: 'uppercase',
             }}
           >
-            <span style={{ color: '#666' }}>Total wasted time</span>
-            <span>{formatTime(totalDistraction)}</span>
+            <span style={{ color: '#666' }}>{copy.totalDistraction}</span>
+            <span>{formatTime(visibleDistractionSeconds)}</span>
           </div>
         </div>
 
@@ -664,7 +741,7 @@ export default function DailyReceiptCard({
               color: '#1c1b1b',
             }}
           >
-            PRACA
+            {copy.workHeader}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -677,7 +754,7 @@ export default function DailyReceiptCard({
               ))
             ) : (
               <div style={{ fontSize: 11, color: '#888', fontStyle: 'italic' }}>
-                Brak pracy dzisiaj
+                {copy.emptyWork}
               </div>
             )}
           </div>
@@ -695,8 +772,8 @@ export default function DailyReceiptCard({
               textTransform: 'uppercase',
             }}
           >
-            <span style={{ color: '#666' }}>Total prod. time</span>
-            <span>{formatTime(totalProductive)}</span>
+            <span style={{ color: '#666' }}>{copy.totalWork}</span>
+            <span>{formatTime(visibleProductiveSeconds)}</span>
           </div>
         </div>
 
@@ -713,7 +790,7 @@ export default function DailyReceiptCard({
               color: '#1c1b1b',
             }}
           >
-            INNE
+            {copy.otherHeader}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -722,34 +799,40 @@ export default function DailyReceiptCard({
                 <div
                   key={index}
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr auto',
-                    columnGap: 10,
-                    rowGap: 6,
-                    fontSize: 11,
+                    display: 'flex',
+                    justifyContent: 'space-between',
                     alignItems: 'center',
+                    gap: 10,
+                    fontSize: 11,
                   }}
                 >
-                  <span style={{ letterSpacing: '0.02em' }}>{app.name}</span>
-                  <span style={{ fontWeight: 500 }}>{formatTime(app.time_seconds)}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    <span style={{ letterSpacing: '0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {app.name}
+                    </span>
+                    <span style={{ fontWeight: 500, color: '#666', fontSize: 10, whiteSpace: 'nowrap' }}>
+                      {app.time_seconds < 60 ? '<1min' : formatTime(app.time_seconds)}
+                    </span>
+                  </div>
 
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                     <button
                       onClick={() => void handleSetManualCategory(app, 'productive')}
                       disabled={classifyingEntryKey !== null}
                       style={{
                         border: '1px solid #ccc',
                         background: '#fff',
-                        padding: '2px 6px',
+                        padding: '2px 5px',
                         borderRadius: 3,
                         cursor: classifyingEntryKey ? 'default' : 'pointer',
-                        fontSize: 9,
+                        fontSize: 8,
                         fontFamily: 'Courier Prime, monospace',
                         color: '#1c1b1b',
                         opacity: classifyingEntryKey === getEntryKey(app) ? 0.6 : 1,
+                        lineHeight: 1.2,
                       }}
                     >
-                      Produktywna
+                      {copy.prodShort}
                     </button>
 
                     <button
@@ -758,23 +841,24 @@ export default function DailyReceiptCard({
                       style={{
                         border: '1px solid #ccc',
                         background: '#fff',
-                        padding: '2px 6px',
+                        padding: '2px 5px',
                         borderRadius: 3,
                         cursor: classifyingEntryKey ? 'default' : 'pointer',
-                        fontSize: 9,
+                        fontSize: 8,
                         fontFamily: 'Courier Prime, monospace',
                         color: '#1c1b1b',
                         opacity: classifyingEntryKey === getEntryKey(app) ? 0.6 : 1,
+                        lineHeight: 1.2,
                       }}
                     >
-                      Rozpraszająca
+                      {copy.nonProdShort}
                     </button>
                   </div>
                 </div>
               ))
             ) : (
               <div style={{ fontSize: 11, color: '#888', fontStyle: 'italic' }}>
-                Brak innych pozycji dzisiaj
+                {copy.emptyOther}
               </div>
             )}
           </div>
@@ -798,13 +882,13 @@ export default function DailyReceiptCard({
               textTransform: 'uppercase',
             }}
           >
-            WYDAJNOŚĆ DNIA: {productivity}%
+            {copy.dayPerformance}: {productivity}%
           </div>
 
           <div style={{ fontSize: 10, color: '#888', fontStyle: 'italic', letterSpacing: '0.03em' }}>
             {totalTime > 0
-              ? `Śledzenie aktywne od ${formatTime(totalTime)}`
-              : 'Zacznij pracować, a zobaczysz statystyki'}
+              ? `${copy.trackingSince} ${formatTime(totalTime)}`
+              : copy.startWorking}
           </div>
         </div>
 
@@ -848,14 +932,28 @@ export default function DailyReceiptCard({
               }}
             >
               {saveImageState === 'saving'
-                ? 'Zapisywanie...'
+                ? copy.saveButtonSaving
                 : saveImageState === 'saved'
-                  ? 'Zapisano ✓'
+                  ? copy.saveButtonSaved
                   : saveImageState === 'error'
-                    ? 'Błąd zapisu'
-                    : 'Zapisz obraz'}
+                    ? copy.saveButtonError
+                    : copy.saveButtonIdle}
             </button>
           </div>
+          {saveImageDetails && (
+            <div
+              style={{
+                marginTop: 8,
+                textAlign: 'center',
+                fontSize: 9,
+                color: saveImageState === 'error' ? '#8a3c3c' : '#666',
+                letterSpacing: '0.02em',
+                wordBreak: 'break-word',
+              }}
+            >
+              {saveImageState === 'saved' ? `${copy.savedIn} ${saveImageDetails}` : saveImageDetails}
+            </div>
+          )}
         </div>
       </div>
     </div>

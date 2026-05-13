@@ -1,8 +1,13 @@
+import type { AppLanguage } from '../i18n'
+
 interface OnboardingCardProps {
   onNext?: () => void
+  language: AppLanguage
 }
 
-export default function OnboardingCard({ onNext }: OnboardingCardProps) {
+export default function OnboardingCard({ onNext, language }: OnboardingCardProps) {
+  const isEnglish = language === 'en'
+
   return (
     <div aria-hidden={false} className="h-full w-full">
       <div
@@ -39,7 +44,7 @@ export default function OnboardingCard({ onNext }: OnboardingCardProps) {
               marginBottom: 18,
             }}
           >
-            KROK 1/3
+            {isEnglish ? 'STEP 2/4' : 'KROK 2/4'}
           </div>
 
           <h1
@@ -53,8 +58,7 @@ export default function OnboardingCard({ onNext }: OnboardingCardProps) {
               textTransform: 'uppercase',
             }}
           >
-            WITAJ W FUGIT
-            <br />CO.
+            {isEnglish ? 'WELCOME TO FUGIT' : 'WITAJ W FUGIT'}
           </h1>
         </div>
 
@@ -86,15 +90,26 @@ export default function OnboardingCard({ onNext }: OnboardingCardProps) {
               color: '#1c1b1b',
             }}
           >
-            Dlaczego paragon? Bo wykresy
-            <br />nie bolą tak, jak wydany czas.
+            {isEnglish ? (
+              <>
+                Every day you will see where your time really goes.
+                <br />
+                Simple, local, no unnecessary charts.
+              </>
+            ) : (
+              <>
+                Codziennie zobaczysz, gdzie realnie ucieka czas.
+                <br />
+                Prosto, lokalnie i bez zbędnych wykresów.
+              </>
+            )}
           </p>
         </div>
 
         {/* Bottom button */}
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <button
-            onClick={() => onNext && onNext()}
+            onClick={() => onNext?.()}
             style={{
               background: '#1e1e1e',
               color: '#fff',
@@ -112,7 +127,7 @@ export default function OnboardingCard({ onNext }: OnboardingCardProps) {
               gap: 10,
             }}
           >
-            <span>DALEJ</span>
+            <span>{isEnglish ? 'NEXT' : 'DALEJ'}</span>
             <span style={{ transform: 'translateY(1px)' }}>→</span>
           </button>
         </div>

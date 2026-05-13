@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import { currentMonitor, getCurrentWindow, LogicalSize } from '@tauri-apps/api/window'
+import { type AppLanguage, LANGUAGE_STORAGE_KEY, normalizeLanguage } from './i18n'
+import OnboardingLanguage from './screens/OnboardingLanguage'
 import Onboarding1 from './screens/Onboarding1'
 import Onboarding2 from './screens/Onboarding2'
 import Onboarding3 from './screens/Onboarding3'
@@ -9,7 +11,7 @@ import DailyReceipt from './screens/DailyReceipt'
 import WeeklyReceipt from './screens/WeeklyReceipt'
 import Settings from './screens/Settings'
 
-type Screen = 'onboarding1' | 'onboarding2' | 'onboarding3' | 'daily' | 'weekly' | 'settings'
+type Screen = 'onboardingLanguage' | 'onboarding1' | 'onboarding2' | 'onboarding3' | 'daily' | 'weekly' | 'settings'
 
 type ScreenWindowPreset = {
   width: number
@@ -19,6 +21,7 @@ type ScreenWindowPreset = {
 const ONBOARDING_COMPLETED_KEY = 'fugit:onboarding-completed'
 
 const screenWindowPresets: Record<Screen, ScreenWindowPreset> = {
+  onboardingLanguage: { width: 330, height: 680 },
   onboarding1: { width: 330, height: 680 },
   onboarding2: { width: 340, height: 760 },
   onboarding3: { width: 350, height: 860 },
@@ -27,44 +30,32 @@ const screenWindowPresets: Record<Screen, ScreenWindowPreset> = {
   settings: { width: 390, height: 880 },
 }
 
-interface DebugAppUsage {
-  name: string
-  time_seconds: number
-}
-
-interface DebugDailyStats {
-  date: string
-  apps: DebugAppUsage[]
-  last_updated: string
-}
-
-interface DebugTrackingProbe {
-  accessibility_permission: boolean
-  can_read_frontmost_app: boolean
-  frontmost_app: string | null
-  error: string | null
-}
-
 /**
  * Fugit - Main App Component
  * 1:1 pixel-perfect design implementation
  * 360px max-width mobile app container with glassmorphism background
  */
 export default function App() {
+  const onboardingCompleted = localStorage.getItem(ONBOARDING_COMPLETED_KEY) === 'true'
+  const storedLanguageValue = localStorage.getItem(LANGUAGE_STORAGE_KEY)
+  const initialSelectedLanguage = storedLanguageValue ? normalizeLanguage(storedLanguageValue) : null
+
+  const [language, setLanguage] = useState<AppLanguage>(initialSelectedLanguage ?? 'pl')
+  const [selectedLanguage, setSelectedLanguage] = useState<AppLanguage | null>(initialSelectedLanguage)
+  const [isSavingLanguage, setIsSavingLanguage] = useState(false)
   const [currentScreen, setCurrentScreen] = useState<Screen>(
-    localStorage.getItem(ONBOARDING_COMPLETED_KEY) === 'true' ? 'daily' : 'onboarding1',
+    onboardingCompleted
+      ? 'daily'
+      : initialSelectedLanguage
+        ? 'onboarding1'
+        : 'onboardingLanguage',
   )
   const [selectedHistoryDate, setSelectedHistoryDate] = useState<string | null>(null)
   const [readyReceiptDate, setReadyReceiptDate] = useState<string | null>(null)
   const [readyReceiptToConfirm, setReadyReceiptToConfirm] = useState<string | null>(null)
   const [reportReadyOverlayOpen, setReportReadyOverlayOpen] = useState(false)
-  const [betaOpen, setBetaOpen] = useState(false)
-  const [betaStats, setBetaStats] = useState<DebugDailyStats | null>(null)
-  const [betaProbe, setBetaProbe] = useState<DebugTrackingProbe | null>(null)
-  const [activeTrackedName, setActiveTrackedName] = useState('')
   const isOnboardingScreen = currentScreen.startsWith('onboarding')
   const isDailyScreen = currentScreen === 'daily'
-  const canShowBetaPanel = currentScreen === 'daily' || currentScreen === 'weekly' || currentScreen === 'settings'
 
   const handleNavigate = (screen: Screen) => {
     setSelectedHistoryDate(null)
@@ -79,6 +70,43 @@ export default function App() {
   const handleCompleteOnboarding = () => {
     localStorage.setItem(ONBOARDING_COMPLETED_KEY, 'true')
     handleNavigate('daily')
+  }
+
+  const handleSelectLanguage = (nextLanguage: AppLanguage) => {
+    setSelectedLanguage(nextLanguage)
+    setLanguage(nextLanguage)
+  }
+
+  const handleConfirmLanguage = async () => {
+    if (!selectedLanguage) {
+      return
+    }
+
+    setIsSavingLanguage(true)
+    setLanguage(selectedLanguage)
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, selectedLanguage)
+
+    try {
+      await invoke('set_language', { language: selectedLanguage })
+    } catch (error) {
+      console.error('Nie udało się zapisać języka:', error)
+    } finally {
+      setIsSavingLanguage(false)
+    }
+
+    handleNavigate('onboarding1')
+  }
+
+  const handleLanguageChange = async (nextLanguage: AppLanguage) => {
+    setLanguage(nextLanguage)
+    setSelectedLanguage(nextLanguage)
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage)
+
+    try {
+      await invoke('set_language', { language: nextLanguage })
+    } catch (error) {
+      console.error('Could not persist language change:', error)
+    }
   }
 
   const handleOpenReadyReceipt = () => {
@@ -191,43 +219,17 @@ export default function App() {
     }
   }, [currentScreen])
 
-  useEffect(() => {
-    if (!betaOpen || !canShowBetaPanel) {
-      return
+  const overlayCopy = language === 'en'
+    ? {
+      title: 'YOUR RECEIPT IS READY',
+      subtitle: 'Tap below to review the report and close the day.',
+      action: 'OPEN RECEIPT',
     }
-
-    const fetchBetaStats = async () => {
-      try {
-        const [stats, probe] = await Promise.all([
-          invoke<DebugDailyStats>('get_daily_stats'),
-          invoke<DebugTrackingProbe>('get_tracking_probe'),
-        ])
-        setBetaStats(stats)
-        setBetaProbe(probe)
-      } catch (error) {
-        console.error('Błąd pobierania podglądu beta:', error)
-      }
+    : {
+      title: 'TWÓJ PARAGON JEST GOTOWY',
+      subtitle: 'Kliknij poniżej, aby obejrzeć raport i zamknąć dzień.',
+      action: 'OBEJRZYJ PARAGON',
     }
-
-    void fetchBetaStats()
-    const interval = window.setInterval(() => {
-      void fetchBetaStats()
-    }, 2000)
-
-    const unlistenPromise = listen<string>('app-switched', (event) => {
-      setActiveTrackedName(event.payload ?? '')
-      void fetchBetaStats()
-    })
-
-    return () => {
-      clearInterval(interval)
-      void unlistenPromise.then((unlisten) => {
-        unlisten()
-      })
-    }
-  }, [betaOpen, canShowBetaPanel])
-
-  const betaApps = [...(betaStats?.apps ?? [])].sort((a, b) => b.time_seconds - a.time_seconds)
 
   return (
     <div
@@ -240,20 +242,43 @@ export default function App() {
       )}
 
       {/* App Container */}
-      <div className="relative z-10 w-full h-full">
-        {currentScreen === 'onboarding1' && <Onboarding1 onNext={() => handleNavigate('onboarding2')} />}
-        {currentScreen === 'onboarding2' && <Onboarding2 onNext={() => handleNavigate('onboarding3')} />}
-        {currentScreen === 'onboarding3' && <Onboarding3 onNext={handleCompleteOnboarding} />}
+        <div className="relative z-10 w-full h-full">
+        {currentScreen === 'onboardingLanguage' && (
+          <OnboardingLanguage
+            selectedLanguage={selectedLanguage}
+            onSelectLanguage={handleSelectLanguage}
+            onNext={() => {
+              void handleConfirmLanguage()
+            }}
+            isSaving={isSavingLanguage}
+          />
+        )}
+        {currentScreen === 'onboarding1' && <Onboarding1 language={language} onNext={() => handleNavigate('onboarding2')} />}
+        {currentScreen === 'onboarding2' && <Onboarding2 language={language} onNext={() => handleNavigate('onboarding3')} />}
+        {currentScreen === 'onboarding3' && <Onboarding3 language={language} onNext={handleCompleteOnboarding} />}
         {currentScreen === 'daily' && (
           <DailyReceipt
+            language={language}
             onNavigate={handleNavigate}
             reportDate={selectedHistoryDate ?? undefined}
             readyForConfirmationDate={readyReceiptToConfirm ?? undefined}
             onConfirmReadyReceipt={handleConfirmReadyReceipt}
           />
         )}
-        {currentScreen === 'weekly' && <WeeklyReceipt onNavigate={handleNavigate} onOpenDayReceipt={handleOpenHistoryDay} />}
-        {currentScreen === 'settings' && <Settings onNavigate={handleNavigate} />}
+        {currentScreen === 'weekly' && (
+          <WeeklyReceipt
+            language={language}
+            onNavigate={handleNavigate}
+            onOpenDayReceipt={handleOpenHistoryDay}
+          />
+        )}
+        {currentScreen === 'settings' && (
+          <Settings
+            language={language}
+            onNavigate={handleNavigate}
+            onLanguageChange={handleLanguageChange}
+          />
+        )}
       </div>
 
       {reportReadyOverlayOpen && !isOnboardingScreen && (
@@ -293,7 +318,7 @@ export default function App() {
                 marginBottom: 10,
               }}
             >
-              TWÓJ PARAGON JEST GOTOWY
+              {overlayCopy.title}
             </div>
             <div
               style={{
@@ -304,7 +329,7 @@ export default function App() {
                 letterSpacing: '0.03em',
               }}
             >
-              Kliknij poniżej, aby obejrzeć raport i zamknąć dzień.
+              {overlayCopy.subtitle}
             </div>
             <button
               onClick={handleOpenReadyReceipt}
@@ -322,96 +347,12 @@ export default function App() {
                 cursor: 'pointer',
               }}
             >
-              OBEJRZYJ PARAGON
+              {overlayCopy.action}
             </button>
           </div>
         </div>
       )}
 
-      {canShowBetaPanel && (
-        <div style={{ position: 'fixed', right: 14, bottom: 14, zIndex: 70 }}>
-          <button
-            onClick={() => setBetaOpen((value) => !value)}
-            style={{
-              background: '#1e1e1e',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 4,
-              padding: '8px 12px',
-              fontSize: 11,
-              fontFamily: 'Courier Prime, monospace',
-              letterSpacing: '0.06em',
-              cursor: 'pointer',
-            }}
-          >
-            {betaOpen ? 'UKRYJ BETA' : 'POKAŻ BETA'}
-          </button>
-
-          {betaOpen && (
-            <div
-              style={{
-                marginTop: 8,
-                width: 320,
-                maxHeight: 340,
-                overflowY: 'auto',
-                background: '#fbfaf5',
-                border: '1px dashed #bdb9b2',
-                borderRadius: 6,
-                padding: 12,
-                boxShadow: '0 10px 24px rgba(0,0,0,0.16)',
-                color: '#1c1b1b',
-                fontFamily: 'Courier Prime, monospace',
-              }}
-            >
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', marginBottom: 8 }}>
-                PODGLĄD BETA
-              </div>
-              <div style={{ fontSize: 10, marginBottom: 4 }}>
-                Aktywne: {activeTrackedName || '—'}
-              </div>
-              <div style={{ fontSize: 10, marginBottom: 4 }}>
-                Accessibility: {betaProbe?.accessibility_permission ? 'OK' : 'NIE'}
-              </div>
-              <div style={{ fontSize: 10, marginBottom: 8 }}>
-                Odczyt front app: {betaProbe?.can_read_frontmost_app ? 'OK' : 'NIE'}
-              </div>
-              {betaProbe?.frontmost_app && (
-                <div style={{ fontSize: 10, marginBottom: 8 }}>
-                  Front app: {betaProbe.frontmost_app}
-                </div>
-              )}
-              {betaProbe?.error && (
-                <div style={{ fontSize: 10, marginBottom: 8, color: '#8a3c3c' }}>
-                  {betaProbe.error}
-                </div>
-              )}
-              {betaApps.length === 0 && (
-                <div style={{ fontSize: 10, color: '#666' }}>
-                  Brak danych jeszcze.
-                </div>
-              )}
-              {betaApps.map((entry, index) => (
-                <div
-                  key={`${entry.name}-${index}`}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    gap: 8,
-                    fontSize: 10,
-                    padding: '4px 0',
-                    borderTop: index === 0 ? '1px dashed #ddd8d1' : undefined,
-                  }}
-                >
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {entry.name}
-                  </span>
-                  <span>{entry.time_seconds}s</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }

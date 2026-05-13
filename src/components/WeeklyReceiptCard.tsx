@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { type AppLanguage, formatDateKey, localeForLanguage, translateWeekdayLabel } from '../i18n'
 
 interface WeeklyReceiptCardProps {
   onNavigate?: (screen: 'weekly' | 'settings' | 'daily') => void
   onOpenDayReceipt?: (date: string) => void
+  language: AppLanguage
 }
 
 interface WeeklyDayHistory {
@@ -24,22 +26,33 @@ interface WeeklyHistory {
   best_day_productivity: number
 }
 
-const fallbackHistory: WeeklyHistory = {
-  week_label: 'Tydzień -',
-  week_start: '',
-  week_end: '',
-  days: [
-    { date: '', day: 'Pon', productivity: 0, streak: false, is_rest_day: false },
-    { date: '', day: 'Wt', productivity: 0, streak: false, is_rest_day: false },
-    { date: '', day: 'Śr', productivity: 0, streak: false, is_rest_day: false },
-    { date: '', day: 'Czw', productivity: 0, streak: false, is_rest_day: false },
-    { date: '', day: 'Pt', productivity: 0, streak: false, is_rest_day: false },
-    { date: '', day: 'Sob', productivity: 0, streak: false, is_rest_day: false },
-    { date: '', day: 'Nd', productivity: 0, streak: false, is_rest_day: false },
-  ],
-  average_productivity: 0,
-  best_day_label: '-',
-  best_day_productivity: 0,
+function localTodayDateKey(): string {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function createFallbackHistory(language: AppLanguage): WeeklyHistory {
+  const daysPl = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Nd']
+  const days = daysPl.map((day) => ({
+    date: '',
+    day: language === 'en' ? translateWeekdayLabel(day, 'en') : day,
+    productivity: 0,
+    streak: false,
+    is_rest_day: false,
+  }))
+
+  return {
+    week_label: language === 'en' ? 'Week -' : 'Tydzień -',
+    week_start: '',
+    week_end: '',
+    days,
+    average_productivity: 0,
+    best_day_label: '-',
+    best_day_productivity: 0,
+  }
 }
 
 function BackIcon() {
@@ -59,7 +72,28 @@ function FlameIcon() {
   )
 }
 
-export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: WeeklyReceiptCardProps) {
+export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt, language }: WeeklyReceiptCardProps) {
+  const isEnglish = language === 'en'
+  const copy = {
+    title: isEnglish ? 'HISTORY' : 'HISTORIA',
+    weeklyProductivity: isEnglish ? 'WEEKLY PRODUCTIVITY' : 'WYDAJNOŚĆ TYGODNIOWA',
+    backAria: isEnglish ? 'Back' : 'Wróć',
+    openDayAria: isEnglish ? 'Open receipt for' : 'Pokaż paragon z dnia',
+    todayBadge: isEnglish ? 'TODAY' : 'DZIŚ',
+    restShort: isEnglish ? 'REST' : 'LUZ',
+    removeRestDay: isEnglish ? 'Remove rest day' : 'Usuń dzień luzu',
+    setRestDay: isEnglish ? 'Set rest day' : 'Ustaw dzień luzu',
+    saving: isEnglish ? 'Saving...' : 'Zapisywanie...',
+    restDaySummaryPrefix: isEnglish ? 'Rest day:' : 'Dzień luzu:',
+    restDayExcluded: isEnglish ? 'excluded from average' : 'wyłączony ze średniej',
+    averageLabel: isEnglish ? 'Average productivity:' : 'Średnia wydajność:',
+    bestDayLabel: isEnglish ? 'Best day:' : 'Najlepszy dzień:',
+    quote: isEnglish ? '"Consistency is the key to success."' : '"Konsekwencja jest kluczem do sukcesu."',
+    restAlreadySetError: isEnglish
+      ? 'A rest day is already set for this week. Unset it first.'
+      : 'W tym tygodniu Rest day jest już ustawiony. Najpierw go odznacz.',
+  }
+  const fallbackHistory = useMemo(() => createFallbackHistory(language), [language])
   const [history, setHistory] = useState<WeeklyHistory>(fallbackHistory)
   const [loading, setLoading] = useState(true)
   const [restDayBusyDate, setRestDayBusyDate] = useState<string | null>(null)
@@ -80,12 +114,25 @@ export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: Week
     void fetchHistory()
   }, [])
 
+  useEffect(() => {
+    setHistory((current) => {
+      if (current.days.length > 0) {
+        return current
+      }
+      return fallbackHistory
+    })
+  }, [fallbackHistory])
+
   const weekData = useMemo(
-    () => (history.days.length > 0 ? history.days : fallbackHistory.days),
-    [history.days],
+    () => (history.days.length > 0 ? history.days : fallbackHistory.days).map((day) => ({
+      ...day,
+      day: translateWeekdayLabel(day.day, language),
+    })),
+    [fallbackHistory.days, history.days, language],
   )
 
   const restDayInWeek = weekData.find((day) => day.is_rest_day)
+  const todayDateKey = localTodayDateKey()
 
   const toggleRestDay = async (day: WeeklyDayHistory) => {
     if (!day.date || restDayBusyDate) {
@@ -99,7 +146,11 @@ export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: Week
       await fetchHistory()
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      setRestDayError(message)
+      if (isEnglish && message.includes("W tym tygodniu Rest day jest już ustawiony")) {
+        setRestDayError(copy.restAlreadySetError)
+      } else {
+        setRestDayError(message)
+      }
     } finally {
       setRestDayBusyDate(null)
     }
@@ -107,7 +158,27 @@ export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: Week
 
   const bestDayText = history.best_day_label === '-' || history.best_day_productivity === 0
     ? '-'
-    : `${history.best_day_label} (${history.best_day_productivity}%)`
+    : `${translateWeekdayLabel(history.best_day_label, language)} (${history.best_day_productivity}%)`
+
+  const weekLabel = useMemo(() => {
+    if (!isEnglish) {
+      return history.week_label
+    }
+
+    if (history.week_start && history.week_end) {
+      const start = new Date(`${history.week_start}T00:00:00`).toLocaleDateString(localeForLanguage(language), {
+        day: '2-digit',
+        month: '2-digit',
+      })
+      const end = new Date(`${history.week_end}T00:00:00`).toLocaleDateString(localeForLanguage(language), {
+        day: '2-digit',
+        month: '2-digit',
+      })
+      return `Week ${start} - ${end}`
+    }
+
+    return 'Week -'
+  }, [history.week_end, history.week_label, history.week_start, isEnglish, language])
 
   return (
     <div className="h-full w-full">
@@ -155,7 +226,7 @@ export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: Week
             onMouseLeave={(event) => {
               event.currentTarget.style.opacity = '0.6'
             }}
-            aria-label="Wróć"
+            aria-label={copy.backAria}
           >
             <BackIcon />
           </button>
@@ -185,10 +256,10 @@ export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: Week
               textTransform: 'uppercase',
             }}
           >
-            HISTORIA
+            {copy.title}
           </h1>
           <div style={{ fontSize: 10, color: '#666', letterSpacing: '0.1em' }}>
-            {history.week_label}
+            {weekLabel}
           </div>
         </div>
 
@@ -204,7 +275,7 @@ export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: Week
               textTransform: 'uppercase',
             }}
           >
-            WYDAJNOŚĆ TYGODNIOWA
+            {copy.weeklyProductivity}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -212,13 +283,16 @@ export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: Week
               const restTakenByOtherDay = Boolean(restDayInWeek && restDayInWeek.date !== day.date)
               const canToggleRestDay = Boolean(day.date) && !restTakenByOtherDay && !restDayBusyDate
               const isBusy = restDayBusyDate === day.date
+              const isToday = Boolean(day.date) && day.date === todayDateKey
 
               return (
                 <div
                   key={`${day.day}-${index}`}
                   style={{
-                    padding: '10px 0',
+                    padding: '10px 8px',
                     borderBottom: index < weekData.length - 1 ? '1px dashed #e8e8e8' : 'none',
+                    borderRadius: 4,
+                    background: isToday ? '#f4f0e6' : 'transparent',
                   }}
                 >
                   <button
@@ -239,15 +313,22 @@ export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: Week
                       cursor: day.date ? 'pointer' : 'default',
                       padding: 0,
                     }}
-                    aria-label={day.date ? `Pokaż paragon z dnia ${day.date}` : `Dzień ${day.day}`}
+                    aria-label={day.date ? `${copy.openDayAria} ${day.date}` : `${isEnglish ? 'Day' : 'Dzień'} ${day.day}`}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 11, width: 32 }}>{day.day}</span>
+                      <span style={{ fontSize: 11, width: 32, fontWeight: isToday ? 700 : 400 }}>
+                        {day.day}
+                      </span>
+                      {isToday && (
+                        <span style={{ fontSize: 8, letterSpacing: '0.08em', color: '#666' }}>
+                          {copy.todayBadge}
+                        </span>
+                      )}
                       {day.streak && day.productivity > 0 && <FlameIcon />}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       {day.is_rest_day ? (
-                        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em' }}>REST</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em' }}>{copy.restShort}</span>
                       ) : (
                         <div
                           style={{
@@ -269,7 +350,7 @@ export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: Week
                         </div>
                       )}
                       <span style={{ fontSize: 11, fontWeight: 500, width: 36, textAlign: 'right' }}>
-                        {day.is_rest_day ? 'REST' : day.productivity > 0 ? `${day.productivity}%` : '-'}
+                        {day.is_rest_day ? copy.restShort : day.productivity > 0 ? `${day.productivity}%` : '-'}
                       </span>
                     </div>
                   </button>
@@ -294,9 +375,11 @@ export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: Week
                         textUnderlineOffset: '3px',
                         padding: 0,
                       }}
-                      aria-label={day.is_rest_day ? `Usuń Rest day dla ${day.day}` : `Ustaw Rest day dla ${day.day}`}
+                      aria-label={day.is_rest_day
+                        ? `${copy.removeRestDay} ${day.day}`
+                        : `${copy.setRestDay} ${day.day}`}
                     >
-                      {isBusy ? 'Zapisywanie...' : day.is_rest_day ? 'Usuń Rest day' : 'Ustaw Rest day'}
+                      {isBusy ? copy.saving : day.is_rest_day ? copy.removeRestDay : copy.setRestDay}
                     </button>
                   </div>
                 </div>
@@ -307,7 +390,7 @@ export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: Week
           <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px dashed #c4c4c4' }}>
             {restDayInWeek && (
               <div style={{ fontSize: 10, color: '#666', marginBottom: 10 }}>
-                Rest day: {restDayInWeek.day} ({restDayInWeek.date}) - wyłączony ze średniej
+                {copy.restDaySummaryPrefix} {restDayInWeek.day} ({formatDateKey(restDayInWeek.date, language)}) - {copy.restDayExcluded}
               </div>
             )}
             {restDayError && (
@@ -324,11 +407,11 @@ export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: Week
                 marginBottom: 8,
               }}
             >
-              <span>Średnia wydajność:</span>
+              <span>{copy.averageLabel}</span>
               <span>{history.average_productivity}%</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-              <span>Najlepszy dzień:</span>
+              <span>{copy.bestDayLabel}</span>
               <span>{bestDayText}</span>
             </div>
           </div>
@@ -346,7 +429,7 @@ export default function WeeklyReceiptCard({ onNavigate, onOpenDayReceipt }: Week
               fontStyle: 'italic',
             }}
           >
-            "Konsekwencja jest kluczem do sukcesu."
+            {copy.quote}
           </div>
         </div>
       </div>

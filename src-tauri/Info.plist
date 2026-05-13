@@ -4,5 +4,7 @@
 <dict>
   <key>NSAppleEventsUsageDescription</key>
   <string>Fugit potrzebuje dostępu do aktywnych kart przeglądarki, aby poprawnie rozdzielać czas pracy i rozproszeń.</string>
+  <key>LSUIElement</key>
+  <true/>
 </dict>
 </plist>

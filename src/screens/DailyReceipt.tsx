@@ -1,10 +1,12 @@
 import DailyReceiptCard from '../components/DailyReceiptCard'
+import type { AppLanguage } from '../i18n'
 
 interface DailyReceiptProps {
   onNavigate: (screen: 'weekly' | 'settings' | 'daily') => void
   reportDate?: string
   readyForConfirmationDate?: string
   onConfirmReadyReceipt?: () => void
+  language: AppLanguage
 }
 
 export default function DailyReceipt({
@@ -12,6 +14,7 @@ export default function DailyReceipt({
   reportDate,
   readyForConfirmationDate,
   onConfirmReadyReceipt,
+  language,
 }: DailyReceiptProps) {
   return (
     <DailyReceiptCard
@@ -19,6 +22,7 @@ export default function DailyReceipt({
       reportDate={reportDate}
       readyForConfirmationDate={readyForConfirmationDate}
       onConfirmReadyReceipt={onConfirmReadyReceipt}
+      language={language}
     />
   )
 }

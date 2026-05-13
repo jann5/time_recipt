@@ -1,8 +1,10 @@
 import { invoke } from '@tauri-apps/api/core'
 import { useEffect, useState } from 'react'
+import type { AppLanguage } from '../i18n'
 
 interface Onboarding2CardProps {
   onNext?: () => void
+  language: AppLanguage
 }
 
 interface TrackingProbe {
@@ -12,45 +14,76 @@ interface TrackingProbe {
   error: string | null
 }
 
-export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
+export default function Onboarding2Card({ onNext, language }: Onboarding2CardProps) {
+  const isEnglish = language === 'en'
+  const copy = {
+    granted: isEnglish ? 'Permissions granted.' : 'Uprawnienia przyznane.',
+    enableAccessibility: isEnglish
+      ? 'Enable Accessibility permission and return to the app.'
+      : 'Włącz uprawnienie Accessibility i wróć do aplikacji.',
+    waitingAccessibility: isEnglish
+      ? 'Waiting for Accessibility permission.'
+      : 'Czekam na nadanie uprawnienia Accessibility.',
+    checkFailed: isEnglish
+      ? 'Could not check permissions.'
+      : 'Nie udało się sprawdzić uprawnień.',
+    openingSettings: isEnglish
+      ? 'Opening system settings...'
+      : 'Otwieram ustawienia systemowe...',
+    nextMissingPermission: isEnglish
+      ? 'Grant Accessibility in System Settings first, then return here.'
+      : 'Najpierw przyznaj uprawnienia w Accessibility i wróć do aplikacji.',
+    retryFailed: isEnglish
+      ? 'Could not verify permissions. Try again.'
+      : 'Nie udało się sprawdzić uprawnień. Spróbuj ponownie.',
+  }
+
   const [status, setStatus] = useState<string>('')
   const [hasAccessibilityPermission, setHasAccessibilityPermission] = useState(false)
 
-  const refreshPermissions = async () => {
+  const verifyPermissionState = async (): Promise<boolean> => {
     try {
       const [hasAccessibility, probe] = await Promise.all([
         invoke<boolean>('check_macos_permissions'),
         invoke<TrackingProbe>('get_tracking_probe'),
       ])
-      const hasPermission = hasAccessibility && probe.accessibility_permission && probe.can_read_frontmost_app
+      const hasPermission = Boolean(
+        hasAccessibility
+        && probe.accessibility_permission
+        && probe.can_read_frontmost_app
+        && probe.frontmost_app,
+      )
       setHasAccessibilityPermission(hasPermission)
-      setStatus((previous) => {
-        if (hasPermission) {
-          return 'Uprawnienia przyznane.'
-        }
-        if (previous === 'Uprawnienia przyznane.') {
-          return ''
-        }
-        return previous
-      })
+
+      if (hasPermission) {
+        setStatus(copy.granted)
+      } else if (probe.error) {
+        setStatus(copy.enableAccessibility)
+      } else {
+        setStatus(copy.waitingAccessibility)
+      }
+      return hasPermission
     } catch (error) {
       console.error('Błąd:', error)
+      setHasAccessibilityPermission(false)
+      setStatus(copy.checkFailed)
+      return false
     }
   }
 
   useEffect(() => {
-    void refreshPermissions()
+    void verifyPermissionState()
 
     const interval = window.setInterval(() => {
-      void refreshPermissions()
+      void verifyPermissionState()
     }, 1500)
 
     const handleFocus = () => {
-      void refreshPermissions()
+      void verifyPermissionState()
     }
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        void refreshPermissions()
+        void verifyPermissionState()
       }
     }
 
@@ -66,58 +99,39 @@ export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
 
   const handleRequestPermissions = async () => {
     try {
-      setStatus('Sprawdzam uprawnienia...')
-      const hasAccessibility = await invoke<boolean>('request_macos_permissions', {
+      setStatus(copy.openingSettings)
+      await invoke<boolean>('request_macos_permissions', {
         openSettings: true,
       })
-      const probe = await invoke<TrackingProbe>('get_tracking_probe')
-      const hasPermission = hasAccessibility && probe.accessibility_permission && probe.can_read_frontmost_app
-      if (hasPermission) {
-        setHasAccessibilityPermission(true)
-        setStatus('Uprawnienia przyznane.')
-      } else {
-        setHasAccessibilityPermission(false)
-        setStatus('Czekam na nadanie uprawnienia Accessibility.')
-        window.setTimeout(() => {
-          void refreshPermissions()
-        }, 1200)
-        window.setTimeout(() => {
-          void refreshPermissions()
-        }, 2800)
-      }
+      setStatus(copy.waitingAccessibility)
+      window.setTimeout(() => {
+        void verifyPermissionState()
+      }, 900)
+      window.setTimeout(() => {
+        void verifyPermissionState()
+      }, 2200)
     } catch (error) {
       console.error('Błąd:', error)
       setHasAccessibilityPermission(false)
-      setStatus('Nie udało się sprawdzić uprawnień. Spróbuj ponownie.')
+      setStatus(copy.retryFailed)
     }
   }
 
   const handleNext = async () => {
-    try {
-      const [hasAccessibility, probe] = await Promise.all([
-        invoke<boolean>('check_macos_permissions'),
-        invoke<TrackingProbe>('get_tracking_probe'),
-      ])
-      const hasPermission = hasAccessibility && probe.accessibility_permission && probe.can_read_frontmost_app
-      setHasAccessibilityPermission(hasPermission)
-      if (hasPermission) {
-        setStatus('Uprawnienia przyznane.')
-        onNext && onNext()
-        return
-      }
-
-      setStatus('Najpierw przyznaj uprawnienia w Accessibility i wróć do aplikacji.')
-    } catch (error) {
-      console.error('Błąd:', error)
-      setStatus('Nie udało się zweryfikować uprawnień.')
+    const hasPermission = await verifyPermissionState()
+    if (hasPermission) {
+      onNext?.()
+      return
     }
+    setStatus(copy.nextMissingPermission)
   }
 
   const handleRestartApp = async () => {
     try {
-      await invoke('restart_app')
+      await invoke<void>('restart_app')
     } catch (error) {
       console.error('Błąd restartu aplikacji:', error)
+      setStatus(copy.nextMissingPermission)
     }
   }
 
@@ -125,7 +139,7 @@ export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
     <div className="h-full w-full">
       <div
         role="dialog"
-        aria-label="Onboarding card step 2"
+        aria-label="Onboarding card step 3"
         className="flex-shrink-0 h-full w-full"
         style={{
           width: '100%',
@@ -157,7 +171,7 @@ export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
               marginBottom: 18,
             }}
           >
-            KROK 2/3
+            {isEnglish ? 'STEP 3/4' : 'KROK 3/4'}
           </div>
 
           <h1
@@ -171,7 +185,7 @@ export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
               textTransform: 'uppercase',
             }}
           >
-            JAK TO DZIAŁA?
+            {isEnglish ? 'HOW IT WORKS?' : 'JAK TO DZIAŁA?'}
           </h1>
         </div>
 
@@ -206,9 +220,19 @@ export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
               color: '#1c1b1b',
             }}
           >
-            Pokazujemy, jak wykorzystujesz czas w aplikacjach i przeglądarce.
-            <br />
-            Twoje dane zostają lokalnie na Twoim Macu — nikt poza Tobą nie ma do nich wglądu.
+            {isEnglish ? (
+              <>
+                We track time spent in apps and browser tabs.
+                <br />
+                Data stays locally on your Mac.
+              </>
+            ) : (
+              <>
+                Mierzymy czas użycia aplikacji i kart przeglądarki.
+                <br />
+                Dane zostają lokalnie na Twoim Macu.
+              </>
+            )}
           </p>
         </div>
 
@@ -231,7 +255,19 @@ export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
               lineHeight: 1.4,
             }}
           >
-            PRZYZNAJ UPRAWNIENIA<br/>MACOS {'->'}
+            {isEnglish ? (
+              <>
+                GRANT PERMISSIONS
+                <br />
+                MACOS {'->'}
+              </>
+            ) : (
+              <>
+                PRZYZNAJ UPRAWNIENIA
+                <br />
+                MACOS {'->'}
+              </>
+            )}
           </button>
 
           <button
@@ -253,7 +289,7 @@ export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
               lineHeight: 1.3,
             }}
           >
-            DALEJ
+            {isEnglish ? 'NEXT' : 'DALEJ'}
           </button>
 
           {status && (
@@ -277,7 +313,9 @@ export default function Onboarding2Card({ onNext }: Onboarding2CardProps) {
                 padding: 0,
               }}
             >
-              Mam włączone → uruchom aplikację ponownie
+              {isEnglish
+                ? 'I already enabled it → restart app'
+                : 'Mam włączone → uruchom aplikację ponownie'}
             </button>
           )}
         </div>

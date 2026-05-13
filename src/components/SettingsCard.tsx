@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { type AppLanguage } from '../i18n'
 
 interface SettingsCardProps {
   onNavigate?: (screen: 'weekly' | 'settings' | 'daily') => void
+  language: AppLanguage
+  onLanguageChange?: (nextLanguage: AppLanguage) => Promise<void>
 }
 
 type BrowserCategory = 'productive' | 'distraction'
@@ -28,6 +31,7 @@ interface UserSettings {
   browser_rules: BrowserRule[]
   daily_report_time: string
   notifications_enabled: boolean
+  language: AppLanguage
 }
 
 interface BrowserDomainInsight {
@@ -83,6 +87,7 @@ const fallbackSettings: UserSettings = {
   ],
   daily_report_time: '22:00',
   notifications_enabled: true,
+  language: 'pl',
 }
 
 const fallbackBrowserInsights: BrowserInsights = {
@@ -123,23 +128,23 @@ function isValidTime(value: string): boolean {
   return /^([01]\d|2[0-3]):([0-5]\d)$/.test(value)
 }
 
-function formatDuration(seconds: number): string {
+function formatDuration(seconds: number, language: AppLanguage): string {
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
   if (h > 0) {
-    return `${h}h ${m}m`
+    return language === 'en' ? `${h}h ${m}m` : `${h}h ${m}m`
   }
-  return `${m}m`
+  return language === 'en' ? `${m}m` : `${m}m`
 }
 
-function sourceLabel(source: DomainSource): string {
+function sourceLabel(source: DomainSource, language: AppLanguage): string {
   if (source === 'manual') {
-    return 'ręczne'
+    return language === 'en' ? 'manual' : 'ręczne'
   }
   if (source === 'system') {
-    return 'baza'
+    return language === 'en' ? 'database' : 'baza'
   }
-  return 'auto'
+  return language === 'en' ? 'automatic' : 'automatyczne'
 }
 
 function isHelperOrUpdaterApp(name: string): boolean {
@@ -194,10 +199,13 @@ function sanitizeDistractionApps(apps: string[]): string[] {
 }
 
 function sanitizeSettings(settings: UserSettings): UserSettings {
+  const normalizedLanguage: AppLanguage = settings.language === 'en' ? 'en' : 'pl'
+
   return {
     ...settings,
     distraction_apps: sanitizeDistractionApps(settings.distraction_apps),
     work_apps: normalizeUnique(settings.work_apps),
+    language: normalizedLanguage,
   }
 }
 
@@ -211,6 +219,10 @@ function createEmptyRuleDraft(): BrowserRuleDraft {
 
 function settingsEqual(a: UserSettings, b: UserSettings): boolean {
   return JSON.stringify(a) === JSON.stringify(b)
+}
+
+function effectiveAutoCategory(category: DomainCategory): BrowserCategory {
+  return category === 'distraction' ? 'distraction' : 'productive'
 }
 
 function normalizeDomainPattern(rawPattern: string): string {
@@ -258,14 +270,90 @@ function extractAppNamesFromFiles(files: FileList): string[] {
   return Array.from(names)
 }
 
-export default function SettingsCard({ onNavigate }: SettingsCardProps) {
-  const [settings, setSettings] = useState<UserSettings>(fallbackSettings)
+export default function SettingsCard({ onNavigate, language, onLanguageChange }: SettingsCardProps) {
+  const isEnglish = language === 'en'
+  const copy = {
+    settingsAria: isEnglish ? 'Settings' : 'Ustawienia',
+    backAria: isEnglish ? 'Back' : 'Wróć',
+    title: isEnglish ? 'SETTINGS' : 'USTAWIENIA',
+    printTime: isEnglish ? 'PRINT TIME' : 'GODZINA WYDRUKU',
+    browserTabs: isEnglish ? '2. BROWSER TABS' : '2. KARTY PRZEGLĄDARKI',
+    appsSection: isEnglish ? '3. APPS' : '3. APLIKACJE',
+    collapse: isEnglish ? 'Collapse' : 'Zwiń',
+    expand: isEnglish ? 'Expand' : 'Rozwiń',
+    loadingDomains: isEnglish
+      ? 'Loading visited domains...'
+      : 'Ładowanie odwiedzonych domen...',
+    noDomains: isEnglish
+      ? 'No visited domains in this browser (last 30 days).'
+      : 'Brak odwiedzonych domen w tej przeglądarce (ostatnie 30 dni).',
+    today: isEnglish ? 'today' : 'dziś',
+    days30: isEnglish ? '30 days' : '30 dni',
+    confidence: isEnglish ? 'confidence' : 'pewność',
+    productive: isEnglish ? 'Productive' : 'Produktywna',
+    distraction: isEnglish ? 'Distracting' : 'Rozpraszająca',
+    domainPlaceholder: isEnglish
+      ? 'Domain or URL, e.g. youtube.com'
+      : 'Domena lub URL, np. youtube.com',
+    labelPlaceholder: isEnglish
+      ? 'Receipt label (optional)'
+      : 'Nazwa na paragonie (opcjonalnie)',
+    productivePlural: isEnglish ? 'Productive' : 'Produktywne',
+    distractionPlural: isEnglish ? 'Distracting' : 'Rozpraszające',
+    addDomain: isEnglish ? '+ Add domain' : '+ Dodaj domenę',
+    loadingApps: isEnglish
+      ? 'Loading app classifications...'
+      : 'Ładowanie klasyfikacji aplikacji...',
+    noApps: isEnglish
+      ? 'No apps available for manual settings.'
+      : 'Brak aplikacji do ręcznego ustawienia.',
+    addAppsFromFolder: isEnglish
+      ? '+ Add apps from folder (default: productive)'
+      : '+ Dodaj aplikacje z folderu (domyślnie jako produktywne)',
+    autoSaveInfo: isEnglish
+      ? 'Changes are saved automatically.'
+      : 'Zmiany zapisują się automatycznie.',
+    timeFormatError: isEnglish
+      ? 'Invalid time format. Use HH:MM.'
+      : 'Niepoprawny format godziny. Użyj HH:MM.',
+    saveError: isEnglish
+      ? 'Could not save settings.'
+      : 'Nie udało się zapisać ustawień.',
+    loadSettingsError: isEnglish
+      ? 'Could not load settings:'
+      : 'Błąd pobierania ustawień:',
+    loadDomainsError: isEnglish
+      ? 'Could not load browser domains:'
+      : 'Błąd pobierania domen przeglądarek:',
+    loadAppsError: isEnglish
+      ? 'Could not load app classifications:'
+      : 'Błąd pobierania klasyfikacji aplikacji:',
+    noAppsFoundInFolder: isEnglish
+      ? 'No .app apps found (helpers, browsers and web pseudo-apps are skipped).'
+      : 'Nie znaleziono aplikacji .app (helpery, przeglądarki i webowe pseudo-apki są pomijane).',
+    domainRecognizeError: isEnglish
+      ? 'Could not recognize domain.'
+      : 'Nie udało się rozpoznać domeny.',
+    domainInputError: isEnglish
+      ? 'Enter domain or URL, e.g. youtube.com.'
+      : 'Podaj domenę lub URL, np. youtube.com.',
+    languageSection: isEnglish ? 'LANGUAGE' : 'JĘZYK',
+    languageSaving: isEnglish ? 'Saving language...' : 'Zapisywanie języka...',
+    languagePolish: isEnglish ? 'Polish' : 'Polski',
+    languageEnglish: 'English',
+  }
+
+  const [settings, setSettings] = useState<UserSettings>(() => ({
+    ...fallbackSettings,
+    language,
+  }))
   const [browserInsights, setBrowserInsights] = useState<BrowserInsights>(fallbackBrowserInsights)
   const [appInsights, setAppInsights] = useState<AppInsights>(fallbackAppInsights)
   const [loading, setLoading] = useState(true)
   const [loadingInsights, setLoadingInsights] = useState(true)
   const [loadingAppInsights, setLoadingAppInsights] = useState(true)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [isChangingLanguage, setIsChangingLanguage] = useState(false)
   const [expandedBrowser, setExpandedBrowser] = useState<string | null>(null)
   const [appsPanelOpen, setAppsPanelOpen] = useState(false)
   const [timeDraft, setTimeDraft] = useState(fallbackSettings.daily_report_time)
@@ -276,22 +364,22 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
       const data = await invoke<BrowserInsights>('get_browser_insights')
       setBrowserInsights(data)
     } catch (error) {
-      console.error('Błąd pobierania domen przeglądarek:', error)
+      console.error(copy.loadDomainsError, error)
     } finally {
       setLoadingInsights(false)
     }
-  }, [])
+  }, [copy.loadDomainsError])
 
   const loadAppInsights = useCallback(async () => {
     try {
       const data = await invoke<AppInsights>('get_app_insights')
       setAppInsights(data)
     } catch (error) {
-      console.error('Błąd pobierania klasyfikacji aplikacji:', error)
+      console.error(copy.loadAppsError, error)
     } finally {
       setLoadingAppInsights(false)
     }
-  }, [])
+  }, [copy.loadAppsError])
 
   const persistSettings = async (nextSettings: UserSettings) => {
     try {
@@ -301,7 +389,7 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
       await loadAppInsights()
     } catch (error) {
       console.error('Błąd zapisywania ustawień:', error)
-      setSaveError('Nie udało się zapisać ustawień.')
+      setSaveError(copy.saveError)
     }
   }
 
@@ -317,7 +405,7 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
           await invoke('update_settings', { newSettings: sanitized })
         }
       } catch (error) {
-        console.error('Błąd pobierania ustawień:', error)
+        console.error(copy.loadSettingsError, error)
       } finally {
         setLoading(false)
       }
@@ -335,7 +423,7 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
     return () => {
       clearInterval(interval)
     }
-  }, [loadAppInsights, loadBrowserInsights])
+  }, [copy.loadSettingsError, loadAppInsights, loadBrowserInsights])
 
   const insightBrowsers = useMemo(
     () => browserInsights.browsers.map((entry) => entry.browser_name),
@@ -351,6 +439,27 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
     const sanitized = sanitizeSettings(nextSettings)
     setSettings(sanitized)
     void persistSettings(sanitized)
+  }
+
+  const changeLanguage = async (nextLanguage: AppLanguage) => {
+    if (nextLanguage === language || isChangingLanguage) {
+      return
+    }
+
+    setIsChangingLanguage(true)
+    setSaveError(null)
+
+    try {
+      if (onLanguageChange) {
+        await onLanguageChange(nextLanguage)
+      }
+      updateSettings({
+        ...settings,
+        language: nextLanguage,
+      })
+    } finally {
+      setIsChangingLanguage(false)
+    }
   }
 
   const isInList = (items: string[], value: string) => {
@@ -453,7 +562,7 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
 
       const appNames = extractAppNamesFromFiles(files)
       if (appNames.length === 0) {
-        setSaveError('Nie znaleziono aplikacji .app (helpery, przeglądarki i webowe pseudo-apki są pomijane).')
+        setSaveError(copy.noAppsFoundInFolder)
         return
       }
 
@@ -470,7 +579,7 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
   const saveTime = () => {
     const normalized = timeDraft.trim()
     if (!isValidTime(normalized)) {
-      setSaveError('Niepoprawny format godziny. Użyj HH:MM.')
+      setSaveError(copy.timeFormatError)
       return
     }
 
@@ -506,7 +615,7 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
   ) => {
     const cleanPattern = normalizeDomainPattern(host)
     if (!cleanPattern) {
-      setSaveError('Nie udało się rozpoznać domeny.')
+      setSaveError(copy.domainRecognizeError)
       return
     }
 
@@ -539,26 +648,12 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
     })
   }
 
-  const resetDomainToAuto = (browser: string, host: string) => {
-    const cleanPattern = normalizeDomainPattern(host)
-    const browserKey = browser.toLowerCase()
-    const nextRules = settings.browser_rules.filter((rule) => (
-      !(normalizeDomainPattern(rule.pattern) === cleanPattern
-      && rule.browsers.map((entry) => entry.toLowerCase()).includes(browserKey))
-    ))
-
-    updateSettings({
-      ...settings,
-      browser_rules: nextRules,
-    })
-  }
-
   const addBrowserRule = (browser: string) => {
     const draft = getRuleDraft(browser)
     const cleanPattern = normalizeDomainPattern(draft.pattern)
 
     if (!cleanPattern) {
-      setSaveError('Podaj domenę lub URL, np. youtube.com.')
+      setSaveError(copy.domainInputError)
       return
     }
 
@@ -577,7 +672,7 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
     <div className="h-full w-full">
       <div
         role="dialog"
-        aria-label="Settings"
+        aria-label={copy.settingsAria}
         className="flex-shrink-0 h-full w-full"
         style={{
           width: '100%',
@@ -618,7 +713,7 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
             onMouseLeave={(event) => {
               event.currentTarget.style.opacity = '0.6'
             }}
-            aria-label="Wróć"
+            aria-label={copy.backAria}
           >
             <BackIcon />
           </button>
@@ -648,7 +743,7 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
               textTransform: 'uppercase',
             }}
           >
-            USTAWIENIA
+            {copy.title}
           </h1>
         </div>
 
@@ -668,7 +763,7 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
                 textTransform: 'uppercase',
               }}
             >
-              GODZINA WYDRUKU
+              {copy.printTime}
             </div>
 
             <input
@@ -700,7 +795,7 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
                 textTransform: 'uppercase',
               }}
             >
-              PRZEGLĄDARKI I DOMENY
+              {copy.browserTabs}
             </div>
 
             <div style={{ marginTop: 8, paddingTop: 2 }}>
@@ -728,94 +823,81 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
                       }}
                     >
                       <span>{browser}</span>
-                      <span style={{ color: '#666', fontSize: 10 }}>{isExpanded ? 'Zwiń' : 'Rozwiń'}</span>
+                      <span style={{ color: '#666', fontSize: 10 }}>{isExpanded ? copy.collapse : copy.expand}</span>
                     </button>
 
                     {isExpanded && (
                       <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {loadingInsights && (
-                          <div style={{ fontSize: 10, color: '#777' }}>Ładowanie odwiedzonych domen...</div>
+                          <div style={{ fontSize: 10, color: '#777' }}>{copy.loadingDomains}</div>
                         )}
 
                         {!loadingInsights && insights.length === 0 && (
                           <div style={{ fontSize: 10, color: '#777' }}>
-                            Brak odwiedzonych domen w tej przeglądarce (ostatnie 30 dni).
+                            {copy.noDomains}
                           </div>
                         )}
 
-                        {insights.map((domain) => (
-                          <div
-                            key={`${browser}-${domain.host}`}
-                            style={{
-                              border: '1px dashed #d8d8d8',
-                              borderRadius: 4,
-                              padding: 8,
-                              background: '#fffdf7',
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                              <span style={{ fontSize: 11 }}>{domain.label}</span>
-                              <span style={{ fontSize: 9, color: '#888', textTransform: 'uppercase' }}>
-                                {sourceLabel(domain.source)}
-                              </span>
+                        {insights.map((domain) => {
+                          const selectedCategory = effectiveAutoCategory(domain.category)
+                          return (
+                            <div
+                              key={`${browser}-${domain.host}`}
+                              style={{
+                                border: '1px dashed #d8d8d8',
+                                borderRadius: 4,
+                                padding: 8,
+                                background: '#fffdf7',
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                <span style={{ fontSize: 11 }}>{domain.label}</span>
+                                <span style={{ fontSize: 9, color: '#888', textTransform: 'uppercase' }}>
+                                  {sourceLabel(domain.source, language)}
+                                </span>
+                              </div>
+
+                              <div style={{ fontSize: 10, color: '#777', marginBottom: 4 }}>{domain.host}</div>
+                              <div style={{ fontSize: 10, color: '#777', marginBottom: 6 }}>
+                                {copy.today}: {formatDuration(domain.today_seconds, language)} · {copy.days30}: {formatDuration(domain.total_seconds, language)} · {copy.confidence}: {domain.confidence}%
+                              </div>
+
+                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                <button
+                                  onClick={() => addOrUpdateBrowserSpecificRule(browser, domain.host, domain.label, 'productive')}
+                                  style={{
+                                    border: '1px solid #ccc',
+                                    background: selectedCategory === 'productive' ? '#f2f7f2' : '#fff',
+                                    padding: '4px 7px',
+                                    borderRadius: 3,
+                                    cursor: 'pointer',
+                                    fontSize: 10,
+                                    fontFamily: 'Courier Prime, monospace',
+                                    color: '#1c1b1b',
+                                  }}
+                                >
+                                  {copy.productive}
+                                </button>
+
+                                <button
+                                  onClick={() => addOrUpdateBrowserSpecificRule(browser, domain.host, domain.label, 'distraction')}
+                                  style={{
+                                    border: '1px solid #ccc',
+                                    background: selectedCategory === 'distraction' ? '#f8f2f2' : '#fff',
+                                    padding: '4px 7px',
+                                    borderRadius: 3,
+                                    cursor: 'pointer',
+                                    fontSize: 10,
+                                    fontFamily: 'Courier Prime, monospace',
+                                    color: '#1c1b1b',
+                                  }}
+                                >
+                                  {copy.distraction}
+                                </button>
+                              </div>
                             </div>
-
-                            <div style={{ fontSize: 10, color: '#777', marginBottom: 4 }}>{domain.host}</div>
-                            <div style={{ fontSize: 10, color: '#777', marginBottom: 6 }}>
-                              dziś: {formatDuration(domain.today_seconds)} · 30 dni: {formatDuration(domain.total_seconds)} · pewność: {domain.confidence}%
-                            </div>
-
-                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                              <button
-                                onClick={() => addOrUpdateBrowserSpecificRule(browser, domain.host, domain.label, 'productive')}
-                                style={{
-                                  border: '1px solid #ccc',
-                                  background: domain.category === 'productive' ? '#f2f7f2' : '#fff',
-                                  padding: '4px 7px',
-                                  borderRadius: 3,
-                                  cursor: 'pointer',
-                                  fontSize: 10,
-                                  fontFamily: 'Courier Prime, monospace',
-                                  color: '#1c1b1b',
-                                }}
-                              >
-                                Produktywna
-                              </button>
-
-                              <button
-                                onClick={() => addOrUpdateBrowserSpecificRule(browser, domain.host, domain.label, 'distraction')}
-                                style={{
-                                  border: '1px solid #ccc',
-                                  background: domain.category === 'distraction' ? '#f8f2f2' : '#fff',
-                                  padding: '4px 7px',
-                                  borderRadius: 3,
-                                  cursor: 'pointer',
-                                  fontSize: 10,
-                                  fontFamily: 'Courier Prime, monospace',
-                                  color: '#1c1b1b',
-                                }}
-                              >
-                                Rozpraszająca
-                              </button>
-
-                              <button
-                                onClick={() => resetDomainToAuto(browser, domain.host)}
-                                style={{
-                                  border: '1px solid #ccc',
-                                  background: domain.source === 'manual' ? '#fff4d6' : '#fff',
-                                  padding: '4px 7px',
-                                  borderRadius: 3,
-                                  cursor: 'pointer',
-                                  fontSize: 10,
-                                  fontFamily: 'Courier Prime, monospace',
-                                  color: '#1c1b1b',
-                                }}
-                              >
-                                Auto
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          )
+                        })}
 
                         <div
                           style={{
@@ -831,7 +913,7 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
                           <input
                             value={draft.pattern}
                             onChange={(event) => updateRuleDraft(browser, { pattern: event.target.value })}
-                            placeholder="Domena lub URL, np. youtube.com"
+                            placeholder={copy.domainPlaceholder}
                             style={{
                               width: '100%',
                               fontSize: 10,
@@ -848,7 +930,7 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
                           <input
                             value={draft.label}
                             onChange={(event) => updateRuleDraft(browser, { label: event.target.value })}
-                            placeholder="Nazwa na paragonie (opcjonalnie)"
+                            placeholder={copy.labelPlaceholder}
                             style={{
                               width: '100%',
                               fontSize: 10,
@@ -877,8 +959,8 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
                                 color: '#1c1b1b',
                               }}
                             >
-                              <option value="productive">Produktywne</option>
-                              <option value="distraction">Rozpraszające</option>
+                              <option value="productive">{copy.productivePlural}</option>
+                              <option value="distraction">{copy.distractionPlural}</option>
                             </select>
 
                             <button
@@ -895,7 +977,7 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
                                 borderRadius: 3,
                               }}
                             >
-                              + Dodaj domenę
+                              {copy.addDomain}
                             </button>
                           </div>
                         </div>
@@ -928,26 +1010,29 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
                 padding: '8px 0',
               }}
             >
-              <span>3. APLIKACJE (RĘCZNE)</span>
-              <span style={{ color: '#666', fontSize: 10 }}>{appsPanelOpen ? 'Zwiń' : 'Rozwiń'}</span>
+              <span>{copy.appsSection}</span>
+              <span style={{ color: '#666', fontSize: 10 }}>{appsPanelOpen ? copy.collapse : copy.expand}</span>
             </button>
 
             {appsPanelOpen && (
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {loadingAppInsights && (
                   <div style={{ fontSize: 10, color: '#777' }}>
-                    Ładowanie klasyfikacji aplikacji...
+                    {copy.loadingApps}
                   </div>
                 )}
 
                 {!loadingAppInsights && visibleAppInsights.length === 0 && (
                   <div style={{ fontSize: 10, color: '#777' }}>
-                    Brak aplikacji do ręcznego ustawienia.
+                    {copy.noApps}
                   </div>
                 )}
 
                 {visibleAppInsights.map((app) => {
                   const manualCategory = currentAppManualCategory(app.name)
+                  const selectedCategory: BrowserCategory = manualCategory === 'neutral'
+                    ? effectiveAutoCategory(app.category)
+                    : manualCategory
                   return (
                     <div
                       key={app.name}
@@ -961,12 +1046,12 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                         <span style={{ fontSize: 11 }}>{app.name}</span>
                         <span style={{ fontSize: 9, color: '#888', textTransform: 'uppercase' }}>
-                          {sourceLabel(manualCategory === 'neutral' ? app.source : 'manual')}
+                          {sourceLabel(manualCategory === 'neutral' ? app.source : 'manual', language)}
                         </span>
                       </div>
 
                       <div style={{ fontSize: 10, color: '#777', marginBottom: 6 }}>
-                        dziś: {formatDuration(app.today_seconds)} · 30 dni: {formatDuration(app.total_seconds)} · pewność: {manualCategory === 'neutral' ? app.confidence : 100}%
+                        {copy.today}: {formatDuration(app.today_seconds, language)} · {copy.days30}: {formatDuration(app.total_seconds, language)} · {copy.confidence}: {manualCategory === 'neutral' ? app.confidence : 100}%
                       </div>
 
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -974,7 +1059,7 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
                           onClick={() => setAppManualCategory(app.name, 'productive')}
                           style={{
                             border: '1px solid #ccc',
-                            background: manualCategory === 'productive' ? '#f2f7f2' : '#fff',
+                            background: selectedCategory === 'productive' ? '#f2f7f2' : '#fff',
                             padding: '4px 7px',
                             borderRadius: 3,
                             cursor: 'pointer',
@@ -983,14 +1068,14 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
                             color: '#1c1b1b',
                           }}
                         >
-                          Produktywna
+                          {copy.productive}
                         </button>
 
                         <button
                           onClick={() => setAppManualCategory(app.name, 'distraction')}
                           style={{
                             border: '1px solid #ccc',
-                            background: manualCategory === 'distraction' ? '#f8f2f2' : '#fff',
+                            background: selectedCategory === 'distraction' ? '#f8f2f2' : '#fff',
                             padding: '4px 7px',
                             borderRadius: 3,
                             cursor: 'pointer',
@@ -999,23 +1084,7 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
                             color: '#1c1b1b',
                           }}
                         >
-                          Rozpraszająca
-                        </button>
-
-                        <button
-                          onClick={() => setAppManualCategory(app.name, 'neutral')}
-                          style={{
-                            border: '1px solid #ccc',
-                            background: manualCategory === 'neutral' ? '#fff4d6' : '#fff',
-                            padding: '4px 7px',
-                            borderRadius: 3,
-                            cursor: 'pointer',
-                            fontSize: 10,
-                            fontFamily: 'Courier Prime, monospace',
-                            color: '#1c1b1b',
-                          }}
-                        >
-                          Auto
+                          {copy.distraction}
                         </button>
                       </div>
                     </div>
@@ -1039,7 +1108,7 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
                     textAlign: 'left',
                   }}
                 >
-                  + Dodaj aplikacje z folderu (domyślnie jako produktywne)
+                  {copy.addAppsFromFolder}
                 </button>
               </div>
             )}
@@ -1050,37 +1119,69 @@ export default function SettingsCard({ onNavigate }: SettingsCardProps) {
               {saveError}
             </div>
           )}
-        </div>
-
-        <div style={{ marginTop: 'auto' }}>
           <div style={{ borderTop: '1px dashed #c4c4c4', marginBottom: 20 }} />
+          <div style={{ fontSize: 10, color: '#777', textAlign: 'center', fontStyle: 'italic' }}>
+            {copy.autoSaveInfo}
+          </div>
 
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <button
-              onClick={() => console.log('Wyloguj')}
+          <div style={{ borderTop: '1px dashed #c4c4c4', marginTop: 16, paddingTop: 14 }}>
+            <div
               style={{
-                background: 'none',
-                border: 'none',
-                color: '#d32f2f',
-                cursor: 'pointer',
-                fontFamily: 'Courier Prime, monospace',
                 fontSize: 10,
-                letterSpacing: '0.1em',
-                textDecoration: 'underline',
-                textUnderlineOffset: '3px',
-                padding: 0,
-                opacity: 0.8,
-                transition: 'opacity 0.2s',
-              }}
-              onMouseEnter={(event) => {
-                event.currentTarget.style.opacity = '1'
-              }}
-              onMouseLeave={(event) => {
-                event.currentTarget.style.opacity = '0.8'
+                fontWeight: 700,
+                letterSpacing: '0.2em',
+                marginBottom: 10,
+                textTransform: 'uppercase',
+                textAlign: 'center',
               }}
             >
-              Wyloguj się
-            </button>
+              {copy.languageSection}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              <button
+                onClick={() => {
+                  void changeLanguage('pl')
+                }}
+                disabled={isChangingLanguage}
+                style={{
+                  border: '1px solid #ccc',
+                  background: language === 'pl' ? '#f2f7f2' : '#fff',
+                  padding: '6px 10px',
+                  borderRadius: 3,
+                  cursor: isChangingLanguage ? 'default' : 'pointer',
+                  fontSize: 10,
+                  fontFamily: 'Courier Prime, monospace',
+                  color: '#1c1b1b',
+                  opacity: isChangingLanguage ? 0.7 : 1,
+                }}
+              >
+                {copy.languagePolish}
+              </button>
+              <button
+                onClick={() => {
+                  void changeLanguage('en')
+                }}
+                disabled={isChangingLanguage}
+                style={{
+                  border: '1px solid #ccc',
+                  background: language === 'en' ? '#f2f7f2' : '#fff',
+                  padding: '6px 10px',
+                  borderRadius: 3,
+                  cursor: isChangingLanguage ? 'default' : 'pointer',
+                  fontSize: 10,
+                  fontFamily: 'Courier Prime, monospace',
+                  color: '#1c1b1b',
+                  opacity: isChangingLanguage ? 0.7 : 1,
+                }}
+              >
+                {copy.languageEnglish}
+              </button>
+            </div>
+            {isChangingLanguage && (
+              <div style={{ fontSize: 10, color: '#777', textAlign: 'center', marginTop: 8 }}>
+                {copy.languageSaving}
+              </div>
+            )}
           </div>
         </div>
       </div>

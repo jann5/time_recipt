@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { type TouchEvent, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import type { AppLanguage } from '../i18n'
 
 interface Onboarding3CardProps {
   onNext?: () => void
+  language: AppLanguage
 }
 
 interface BrowserRule {
@@ -18,6 +20,7 @@ interface UserSettings {
   browser_rules: BrowserRule[]
   daily_report_time: string
   notifications_enabled: boolean
+  language: AppLanguage
 }
 
 function parseTime(value: string): { hour: number; minute: number } | null {
@@ -32,7 +35,19 @@ function parseTime(value: string): { hour: number; minute: number } | null {
   }
 }
 
-export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
+export default function Onboarding3Card({ onNext, language }: Onboarding3CardProps) {
+  const isEnglish = language === 'en'
+  const copy = {
+    loadSettingsError: isEnglish
+      ? 'Could not load onboarding settings:'
+      : 'Nie udało się wczytać ustawień onboarding:',
+    saveSettingsError: isEnglish
+      ? 'Could not save onboarding settings:'
+      : 'Nie udało się zapisać ustawień onboarding:',
+    saveErrorText: isEnglish
+      ? 'Could not save settings. Try again.'
+      : 'Nie udało się zapisać ustawień. Spróbuj ponownie.',
+  }
   const [hour, setHour] = useState(22)
   const [minute, setMinute] = useState(0)
   const [saveError, setSaveError] = useState('')
@@ -55,7 +70,7 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
           setMinute(parsedTime.minute)
         }
       } catch (error) {
-        console.error('Nie udało się wczytać ustawień onboarding:', error)
+        console.error(copy.loadSettingsError, error)
       }
     }
 
@@ -163,7 +178,7 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
     onMouseDown: () => startHold(action),
     onMouseUp: clearHold,
     onMouseLeave: clearHold,
-    onTouchStart: (event: React.TouchEvent<HTMLButtonElement>) => {
+    onTouchStart: (event: TouchEvent<HTMLButtonElement>) => {
       event.preventDefault()
       startHold(action)
     },
@@ -188,8 +203,8 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
 
       onNext && onNext()
     } catch (error) {
-      console.error('Nie udało się zapisać ustawień onboarding:', error)
-      setSaveError('Nie udało się zapisać ustawień. Spróbuj ponownie.')
+      console.error(copy.saveSettingsError, error)
+      setSaveError(copy.saveErrorText)
     } finally {
       setIsSaving(false)
     }
@@ -199,7 +214,7 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
     <div className="h-full w-full">
       <div
         role="dialog"
-        aria-label="Onboarding card step 3"
+        aria-label="Onboarding card step 4"
         className="flex-shrink-0 h-full w-full"
         style={{
           width: '100%',
@@ -230,7 +245,7 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
               marginBottom: 18,
             }}
           >
-            KROK 3/3
+            {isEnglish ? 'STEP 4/4' : 'KROK 4/4'}
           </div>
 
           <h1
@@ -242,7 +257,7 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
               textTransform: 'uppercase',
             }}
           >
-            GODZINA WYDRUKU
+            {isEnglish ? 'REPORT TIME' : 'GODZINA WYDRUKU'}
           </h1>
 
           <p
@@ -253,9 +268,19 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
               marginBottom: 20,
             }}
           >
-            Ustaw godzinę codziennego podsumowania.
-            <br />
-            Możesz przytrzymać strzałkę, żeby przewijać szybciej.
+            {isEnglish ? (
+              <>
+                Set your daily summary time.
+                <br />
+                Hold arrows to scroll faster.
+              </>
+            ) : (
+              <>
+                Ustaw godzinę codziennego podsumowania.
+                <br />
+                Możesz przytrzymać strzałkę, żeby przewijać szybciej.
+              </>
+            )}
           </p>
 
           <div style={{ borderTop: '1px dashed #c4c4c4', marginBottom: 20 }} />
@@ -272,12 +297,12 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
               alignItems: 'center',
               gap: 8,
             }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 6v6l4 2" />
-            </svg>
-            CZAS RAPORTU
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 6v6l4 2" />
+              </svg>
+            {isEnglish ? 'REPORT TIME' : 'CZAS RAPORTU'}
           </div>
 
           <div
@@ -295,7 +320,7 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <button
                 type="button"
-                aria-label="Zwiększ godzinę"
+                aria-label={isEnglish ? 'Increase hour' : 'Zwiększ godzinę'}
                 {...holdButtonHandlers(() => shiftHour(1))}
                 style={{
                   background: 'none',
@@ -313,7 +338,7 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
               </span>
               <button
                 type="button"
-                aria-label="Zmniejsz godzinę"
+                aria-label={isEnglish ? 'Decrease hour' : 'Zmniejsz godzinę'}
                 {...holdButtonHandlers(() => shiftHour(-1))}
                 style={{
                   background: 'none',
@@ -333,7 +358,7 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <button
                 type="button"
-                aria-label="Zwiększ minuty"
+                aria-label={isEnglish ? 'Increase minutes' : 'Zwiększ minuty'}
                 {...holdButtonHandlers(() => shiftMinute(1))}
                 style={{
                   background: 'none',
@@ -351,7 +376,7 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
               </span>
               <button
                 type="button"
-                aria-label="Zmniejsz minuty"
+                aria-label={isEnglish ? 'Decrease minutes' : 'Zmniejsz minuty'}
                 {...holdButtonHandlers(() => shiftMinute(-1))}
                 style={{
                   background: 'none',
@@ -400,7 +425,7 @@ export default function Onboarding3Card({ onNext }: Onboarding3CardProps) {
               opacity: isSaving ? 0.85 : 1,
             }}
           >
-            {isSaving ? 'ZAPISYWANIE...' : 'ZACZNIJ'}
+            {isSaving ? (isEnglish ? 'SAVING...' : 'ZAPISYWANIE...') : isEnglish ? 'START' : 'ZACZNIJ'}
           </button>
         </div>
       </div>
