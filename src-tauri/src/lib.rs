@@ -1280,18 +1280,18 @@ async fn tracking_loop(state: Arc<AppState>, app_handle: tauri::AppHandle) {
     loop {
         interval.tick().await;
 
-        // Do not read active windows/apps until Accessibility is granted.
-        // This prevents permission prompts before onboarding step 2.
-        if !has_runtime_tracking_permissions() {
-            continue;
-        }
-
         let switched_from_date = match state.ensure_current_day().await {
             Ok(switched_from_date) => switched_from_date,
             Err(_) => continue,
         };
         if let Some(previous_date) = switched_from_date {
             let _ = app_handle.emit("daily-report-ready", previous_date);
+        }
+
+        // Do not read active windows/apps until runtime tracking access is available.
+        // This prevents permission prompts before onboarding step 2.
+        if !has_runtime_tracking_permissions() {
+            continue;
         }
 
         let Some(active_window) = get_active_window() else {
@@ -3195,9 +3195,13 @@ fn check_accessibility_permissions(_prompt: bool) -> bool {
 }
 
 fn has_runtime_tracking_permissions() -> bool {
-    // Accessibility permission is mandatory for tracking.
-    // Do not fallback to Apple Events checks here.
-    check_accessibility_permissions(false)
+    if check_accessibility_permissions(false) {
+        return true;
+    }
+
+    // Fallback for systems where Accessibility check reports false
+    // but reading the frontmost app is already allowed.
+    read_frontmost_app_name().is_ok()
 }
 
 fn open_accessibility_settings() {
