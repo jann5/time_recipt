@@ -20,6 +20,16 @@ Fugit to lekka aplikacja menu bar na macOS, która śledzi czas spędzony w apli
 System Settings → Privacy &amp; Security → przewiń na dół → <strong>"Fugit was blocked"</strong> → <strong>Open Anyway</strong>.
 </p>
 
+## Navigation
+
+| Sekcja | Opis |
+|---|---|
+| [Co robi Fugit](#co-robi-fugit) | Krótki overview produktu |
+| [Wymagania i kompatybilność](#wymagania-i-kompatybilność) | Wersje macOS i architektury |
+| [Szybki start dla użytkownika](#szybki-start-dla-użytkownika) | Instalacja i pierwsze uruchomienie |
+| [Troubleshooting macOS (Gatekeeper)](#troubleshooting-macos-gatekeeper) | Co zrobić przy blokadzie uruchomienia |
+| [Buildy i paczki](#buildy-i-paczki) | ZIP i DMG release |
+
 ## Co robi Fugit
 
 - Śledzi aktywną aplikację i czas pracy w interwałach 5 s.
@@ -34,6 +44,11 @@ System Settings → Privacy &amp; Security → przewiń na dół → <strong>"Fu
 - Architektura: `Intel (x86_64)` i `Apple Silicon (arm64)`
 - Ventura (`13.x`) jest wspierana
 
+| Kanał dystrybucji | Format | Cel |
+|---|---|---|
+| Publiczny szybki download | `Fugit.zip` | Prosty install i test aplikacji |
+| Produkcyjny release | `Fugit.dmg` (Developer ID + notarization) | Najlepsza zgodność z Gatekeeper |
+
 ## Szybki start dla użytkownika
 
 1. Pobierz `Fugit.zip` z przycisku powyżej.
@@ -41,6 +56,18 @@ System Settings → Privacy &amp; Security → przewiń na dół → <strong>"Fu
 3. Przenieś `Fugit.app` do `/Applications`.
 4. Uruchom aplikację.
 5. Przy pierwszym starcie nadaj wymagane uprawnienia (Accessibility / System Events).
+
+<details>
+<summary><strong>CLI fallback (opcjonalnie)</strong></summary>
+
+Jeśli chcesz uruchomić ręcznie z Terminala:
+
+```bash
+cd /Applications
+open Fugit.app
+```
+
+</details>
 
 ## Prywatność
 
@@ -101,6 +128,14 @@ Skrypt ZIP:
 - podpisuje ad-hoc,
 - czyści atrybuty `xattr` na `.app`,
 - pakuje do `downloads/Fugit.zip`.
+
+<details>
+<summary><strong>Co trafia na GitHub po buildzie ZIP</strong></summary>
+
+- `downloads/Fugit.zip`
+- Link z README wskazuje bezpośrednio na `raw.githubusercontent.com/.../downloads/Fugit.zip`.
+
+</details>
 
 ### DMG release (podpis + notarization Apple)
 
