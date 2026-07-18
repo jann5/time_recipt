@@ -16,8 +16,8 @@ Fugit to lekka aplikacja menu bar na macOS, która śledzi czas spędzony w apli
   <img src="https://img.shields.io/badge/WA%C5%BBNE-macOS%20mo%C5%BCe%20zablokowa%C4%87%20pierwsze%20uruchomienie%20aplikacji-C2410C?style=for-the-badge&labelColor=111827" alt="Ważne: macOS może zablokować pierwsze uruchomienie aplikacji" />
 </p>
 
-<p align="center"><strong>Jeśli pojawi się blokada uruchomienia:</strong><br/>
-System Settings → Privacy &amp; Security → przewiń na dół → <strong>"Fugit was blocked"</strong> → <strong>Open Anyway</strong>.
+<p align="center"><strong>Pierwsze uruchomienie:</strong><br/>
+Kliknij PPM na <strong>Fugit.app</strong> (albo <strong>Control + klik</strong>) → <strong>Open / Otwórz</strong>.
 </p>
 
 ## Inside Fugit
@@ -91,9 +91,10 @@ Przykładowe pliki:
 
 Jeśli macOS zablokuje aplikację po pobraniu z internetu:
 
-1. Spróbuj uruchomić ponownie z Finder: PPM na `Fugit.app` → `Open`.
-2. Jeśli dalej blokuje, użyj: System Settings → Privacy & Security → `Open Anyway`.
-3. Wersja produkcyjna bez ostrzeżeń dla większości użytkowników wymaga podpisu Developer ID i notarization Apple.
+1. W Finder kliknij PPM na `Fugit.app` (albo przytrzymaj `Control` i kliknij).
+2. Wybierz `Open` / `Otwórz`, a następnie potwierdź otwarcie aplikacji.
+3. Jeśli macOS nadal blokuje aplikację, użyj: System Settings → Privacy & Security → `Open Anyway`.
+4. Wersja produkcyjna bez ostrzeżeń dla większości użytkowników wymaga podpisu Developer ID i notarization Apple.
 
 ## Uruchomienie lokalne (deweloperskie)
 
