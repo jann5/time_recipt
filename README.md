@@ -1,5 +1,15 @@
 # Fugit
 
+## Instalacja przez Terminal
+
+Na aktualnym macOS pobrana przez przeglądarkę paczka może zostać zablokowana bez przycisku „Otwórz”. Ta komenda pobiera oficjalny `Fugit.zip`, sprawdza podpis paczki, instaluje `Fugit.app` w `~/Applications`, usuwa z niej atrybut kwarantanny i uruchamia aplikację:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jann5/time_recipt/main/scripts/install-fugit-macos.sh | bash
+```
+
+Przy ponownym uruchomieniu zastępuje tylko `~/Applications/Fugit.app`; dane Fugit w `~/Library/Application Support` zostają nietknięte.
+
 Fugit to lekka aplikacja menu bar na macOS, która śledzi czas spędzony w aplikacjach i pokazuje dzień w formie czytelnego „paragonu produktywności”.
 
 ![Version](https://img.shields.io/badge/version-0.1.0-green)
@@ -10,14 +20,6 @@ Fugit to lekka aplikacja menu bar na macOS, która śledzi czas spędzony w apli
   <a href="https://raw.githubusercontent.com/jann5/time_recipt/main/downloads/Fugit.zip" download>
     <img src="https://img.shields.io/badge/DOWNLOAD%20FUGIT%20(INTEL%20%2B%20APPLE%20SILICON)-111827?style=for-the-badge&logo=apple&logoColor=white" alt="Download Fugit for macOS (Intel + Apple Silicon)" />
   </a>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/WA%C5%BBNE-macOS%20mo%C5%BCe%20zablokowa%C4%87%20pierwsze%20uruchomienie%20aplikacji-C2410C?style=for-the-badge&labelColor=111827" alt="Ważne: macOS może zablokować pierwsze uruchomienie aplikacji" />
-</p>
-
-<p align="center"><strong>Pierwsze uruchomienie:</strong><br/>
-Kliknij PPM na <strong>Fugit.app</strong> (albo <strong>Control + klik</strong>) → <strong>Open / Otwórz</strong>.
 </p>
 
 ## Inside Fugit
@@ -31,6 +33,7 @@ Kliknij PPM na <strong>Fugit.app</strong> (albo <strong>Control + klik</strong>)
 | Sekcja | Opis |
 |---|---|
 | [Co robi Fugit](#co-robi-fugit) | Krótki overview produktu |
+| [Instalacja przez Terminal](#instalacja-przez-terminal) | Pobranie i usunięcie kwarantanny automatycznie |
 | [Wymagania i kompatybilność](#wymagania-i-kompatybilność) | Wersje macOS i architektury |
 | [Szybki start dla użytkownika](#szybki-start-dla-użytkownika) | Instalacja i pierwsze uruchomienie |
 | [Troubleshooting macOS (Gatekeeper)](#troubleshooting-macos-gatekeeper) | Co zrobić przy blokadzie uruchomienia |
@@ -57,20 +60,18 @@ Kliknij PPM na <strong>Fugit.app</strong> (albo <strong>Control + klik</strong>)
 
 ## Szybki start dla użytkownika
 
-1. Pobierz `Fugit.zip` z przycisku powyżej.
-2. Rozpakuj archiwum.
-3. Przenieś `Fugit.app` do `/Applications`.
-4. Uruchom aplikację.
-5. Przy pierwszym starcie nadaj wymagane uprawnienia (Accessibility / System Events).
+1. Najprościej: uruchom komendę Terminala z góry README.
+2. Aplikacja pojawi się w `~/Applications/Fugit.app` i zostanie uruchomiona.
+3. Przy pierwszym starcie nadaj wymagane uprawnienia (Accessibility / System Events).
 
 <details>
 <summary><strong>CLI fallback (opcjonalnie)</strong></summary>
 
-Jeśli chcesz uruchomić ręcznie z Terminala:
+Jeśli aplikacja została już pobrana z przeglądarki, możesz usunąć kwarantannę ręcznie, podając jej prawdziwą lokalizację:
 
 ```bash
-cd /Applications
-open Fugit.app
+xattr -dr com.apple.quarantine "$HOME/Applications/Fugit.app"
+open "$HOME/Applications/Fugit.app"
 ```
 
 </details>
@@ -89,12 +90,7 @@ Przykładowe pliki:
 
 ## Troubleshooting macOS (Gatekeeper)
 
-Jeśli macOS zablokuje aplikację po pobraniu z internetu:
-
-1. W Finder kliknij PPM na `Fugit.app` (albo przytrzymaj `Control` i kliknij).
-2. Wybierz `Open` / `Otwórz`, a następnie potwierdź otwarcie aplikacji.
-3. Jeśli macOS nadal blokuje aplikację, użyj: System Settings → Privacy & Security → `Open Anyway`.
-4. Wersja produkcyjna bez ostrzeżeń dla większości użytkowników wymaga podpisu Developer ID i notarization Apple.
+Jeśli widzisz ekran „Apple could not verify … is free of malware”, użyj komendy instalacyjnej z początku README. PPM nie jest tu podawane jako obejście, bo na aktualnym macOS może ponownie pokazać ten sam ekran. Instalator usuwa wyłącznie `com.apple.quarantine` z pobranej kopii Fugit po lokalnej weryfikacji podpisu.
 
 ## Uruchomienie lokalne (deweloperskie)
 
