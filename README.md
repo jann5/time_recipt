@@ -23,12 +23,8 @@ System Settings → Privacy &amp; Security → przewiń na dół → <strong>"Fu
 ## Inside Fugit
 
 <p align="center">
-  <a href="docs/images/fugit-daily-report.jpg"><img width="32%" src="docs/images/fugit-daily-report.jpg" alt="Fugit daily report screen" /></a>
-  <a href="docs/images/fugit-weekly-history.jpg"><img width="32%" src="docs/images/fugit-weekly-history.jpg" alt="Fugit weekly history screen" /></a>
-  <a href="docs/images/fugit-settings.jpg"><img width="32%" src="docs/images/fugit-settings.jpg" alt="Fugit settings screen" /></a>
+  <img width="100%" src="docs/images/fugit-screen-gallery.jpg" alt="Fugit daily receipt, weekly history and settings screens" />
 </p>
-
-<p align="center"><sub>Daily receipt · Weekly rhythm · Categories on your terms</sub></p>
 
 ## Navigation
 
