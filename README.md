@@ -20,6 +20,12 @@ Fugit to lekka aplikacja menu bar na macOS, która śledzi czas spędzony w apli
 System Settings → Privacy &amp; Security → przewiń na dół → <strong>"Fugit was blocked"</strong> → <strong>Open Anyway</strong>.
 </p>
 
+## Inside Fugit
+
+<p align="center">
+  <img width="100%" src="docs/images/fugit-screen-gallery.jpg" alt="Fugit daily receipt, weekly history and settings screens" />
+</p>
+
 ## Navigation
 
 | Sekcja | Opis |
