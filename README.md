@@ -1,182 +1,76 @@
 # Fugit
 
-## Instalacja przez Terminal
+> A private, native macOS menu-bar app for seeing where your time went.
 
-Na aktualnym macOS pobrana przez przeglądarkę paczka może zostać zablokowana bez przycisku „Otwórz”. Ta komenda pobiera oficjalny `Fugit.zip`, sprawdza podpis paczki, instaluje `Fugit.app` w `~/Applications`, usuwa z niej atrybut kwarantanny i uruchamia aplikację:
+Fugit tracks active-app time locally and turns a day into a clear productivity receipt: focused time, distractions, neutral apps, and a weekly trend. It does not require an account or cloud sync.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/jann5/time_recipt/main/scripts/install-fugit-macos.sh | bash
-```
+[**Download the latest macOS release**](https://github.com/jann5/fugit/releases/latest)
 
-Przy ponownym uruchomieniu zastępuje tylko `~/Applications/Fugit.app`; dane Fugit w `~/Library/Application Support` zostają nietknięte.
+![Fugit daily receipt, weekly history and settings](docs/images/fugit-screen-gallery.jpg)
 
-Fugit to lekka aplikacja menu bar na macOS, która śledzi czas spędzony w aplikacjach i pokazuje dzień w formie czytelnego „paragonu produktywności”.
+## What it does
 
-![Version](https://img.shields.io/badge/version-0.1.0-green)
-![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)
-![License](https://img.shields.io/badge/license-MIT-blue)
+- tracks the active macOS application in short intervals;
+- groups activity into productive, distracting, and neutral categories;
+- shows a readable daily receipt and weekly trend;
+- stores data locally, without an account or server sync;
+- provides a lightweight menu-bar experience instead of another full-screen dashboard.
 
-<p align="center">
-  <a href="https://raw.githubusercontent.com/jann5/time_recipt/main/downloads/Fugit.zip" download>
-    <img src="https://img.shields.io/badge/DOWNLOAD%20FUGIT%20(INTEL%20%2B%20APPLE%20SILICON)-111827?style=for-the-badge&logo=apple&logoColor=white" alt="Download Fugit for macOS (Intel + Apple Silicon)" />
-  </a>
-</p>
+## Install
 
-## Inside Fugit
+1. Open [Releases](https://github.com/jann5/fugit/releases/latest).
+2. Download <code>Fugit.dmg</code> or <code>Fugit.zip</code> for your Mac.
+3. Move <strong>Fugit.app</strong> to Applications and grant the requested Accessibility / System Events permissions on first launch.
 
-<p align="center">
-  <img width="100%" src="docs/images/fugit-screen-gallery.jpg" alt="Fugit daily receipt, weekly history and settings screens" />
-</p>
+### Terminal install (optional)
 
-## Navigation
+The installer downloads the ZIP from the latest GitHub Release, verifies the app bundle signature, installs it into <code>~/Applications</code>, and leaves existing Fugit data untouched.
 
-| Sekcja | Opis |
-|---|---|
-| [Co robi Fugit](#co-robi-fugit) | Krótki overview produktu |
-| [Instalacja przez Terminal](#instalacja-przez-terminal) | Pobranie i usunięcie kwarantanny automatycznie |
-| [Wymagania i kompatybilność](#wymagania-i-kompatybilność) | Wersje macOS i architektury |
-| [Szybki start dla użytkownika](#szybki-start-dla-użytkownika) | Instalacja i pierwsze uruchomienie |
-| [Troubleshooting macOS (Gatekeeper)](#troubleshooting-macos-gatekeeper) | Co zrobić przy blokadzie uruchomienia |
-| [Buildy i paczki](#buildy-i-paczki) | ZIP i DMG release |
+~~~bash
+curl -fsSLO https://raw.githubusercontent.com/jann5/fugit/main/scripts/install-fugit-macos.sh
+bash install-fugit-macos.sh
+~~~
 
-## Co robi Fugit
+## Compatibility
 
-- Śledzi aktywną aplikację i czas pracy w interwałach 5 s.
-- Rozdziela aktywność na kategorie: produktywne, rozpraszające i neutralne.
-- Pokazuje dzienny raport w formie „paragonu”.
-- Buduje tygodniowe podsumowanie trendu.
-- Działa lokalnie, bez konta i bez synchronizacji do chmury.
+- macOS 10.15 or newer
+- Intel (<code>x86_64</code>) and Apple Silicon (<code>arm64</code>)
 
-## Wymagania i kompatybilność
+## Privacy
 
-- macOS `10.15+`
-- Architektura: `Intel (x86_64)` i `Apple Silicon (arm64)`
-- Ventura (`13.x`) jest wspierana
+Fugit keeps its application data locally in:
 
-| Kanał dystrybucji | Format | Cel |
-|---|---|---|
-| Publiczny szybki download | `Fugit.zip` | Prosty install i test aplikacji |
-| Produkcyjny release | `Fugit.dmg` (Developer ID + notarization) | Najlepsza zgodność z Gatekeeper |
+~~~text
+~/Library/Application Support/com.jannawrot.fugit/
+~~~
 
-## Szybki start dla użytkownika
+Typical files include settings, daily statistics, and rest-day data. The app has no user account and no cloud synchronisation.
 
-1. Najprościej: uruchom komendę Terminala z góry README.
-2. Aplikacja pojawi się w `~/Applications/Fugit.app` i zostanie uruchomiona.
-3. Przy pierwszym starcie nadaj wymagane uprawnienia (Accessibility / System Events).
+## Develop locally
 
-<details>
-<summary><strong>CLI fallback (opcjonalnie)</strong></summary>
+Requirements: Node.js 18+, npm, and Rust through <code>rustup</code>.
 
-Jeśli aplikacja została już pobrana z przeglądarki, możesz usunąć kwarantannę ręcznie, podając jej prawdziwą lokalizację:
-
-```bash
-xattr -dr com.apple.quarantine "$HOME/Applications/Fugit.app"
-open "$HOME/Applications/Fugit.app"
-```
-
-</details>
-
-## Prywatność
-
-Fugit zapisuje dane tylko lokalnie, domyślnie w:
-
-`~/Library/Application Support/com.jannawrot.fugit/`
-
-Przykładowe pliki:
-
-- `settings.json`
-- `YYYY-MM-DD.json` (statystyki dzienne)
-- `rest_days.json`
-
-## Troubleshooting macOS (Gatekeeper)
-
-Jeśli widzisz ekran „Apple could not verify … is free of malware”, użyj komendy instalacyjnej z początku README. PPM nie jest tu podawane jako obejście, bo na aktualnym macOS może ponownie pokazać ten sam ekran. Instalator usuwa wyłącznie `com.apple.quarantine` z pobranej kopii Fugit po lokalnej weryfikacji podpisu.
-
-## Uruchomienie lokalne (deweloperskie)
-
-### Wymagania
-
-- Node.js `18+`
-- npm `9+`
-- Rust (rustup)
-
-Instalacja zależności i start:
-
-```bash
+~~~bash
 npm install
 npm run tauri dev
-```
+~~~
 
-## Buildy i paczki
+Useful commands:
 
-### Build aplikacji
-
-```bash
+~~~bash
+npm run build
 npm run tauri build
-```
-
-### ZIP (dystrybucja szybka)
-
-```bash
-# universal (Intel + Apple Silicon)
 npm run build:zip
-
-# natywny dla hosta
-npm run build:zip:native
-```
-
-Skrypt ZIP:
-
-- buduje `.app`,
-- podpisuje ad-hoc,
-- czyści atrybuty `xattr` na `.app`,
-- pakuje do `downloads/Fugit.zip`.
-
-<details>
-<summary><strong>Co trafia na GitHub po buildzie ZIP</strong></summary>
-
-- `downloads/Fugit.zip`
-- Link z README wskazuje bezpośrednio na `raw.githubusercontent.com/.../downloads/Fugit.zip`.
-
-</details>
-
-### DMG release (podpis + notarization Apple)
-
-To ścieżka produkcyjna do publicznej dystrybucji.
-
-```bash
-export APPLE_SIGN_IDENTITY="Developer ID Application: Twoje Imie (TEAMID)"
-export APPLE_NOTARY_PROFILE="fugit-notary"
 npm run build:dmg
-```
-
-Alternatywnie do notaryzacji można użyć:
-
-- `APPLE_ID`
-- `APPLE_APP_SPECIFIC_PASSWORD`
-- `APPLE_TEAM_ID`
-
-Po udanym release skrypt kopiuje plik do `downloads/Fugit.dmg`.
-
-## Struktura repo
-
-```text
-time_recipt/
-├── src/                 # frontend React + TypeScript
-├── src-tauri/           # backend Rust + konfiguracja Tauri
-├── downloads/           # artefakty publikowane na GitHub
-├── scripts/             # skrypty build/release
-└── README.md
-```
+~~~
 
 ## Stack
 
-- React 19
-- TypeScript
+- React and TypeScript
 - Vite
 - Rust
 - Tauri 2
 
-## Licencja
+## Release workflow
 
-MIT
+Release builds are published through [GitHub Releases](https://github.com/jann5/fugit/releases), so each version has a stable download page and versioned assets.
