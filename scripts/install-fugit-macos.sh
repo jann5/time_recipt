@@ -1,13 +1,12 @@
 #!/bin/bash
 
-# Installs the public Fugit build without leaving the browser quarantine flag
-# on the application bundle. User data in ~/Library/Application Support is not
-# touched when an existing Fugit.app is replaced.
+# Installs the latest public Fugit release. User data in
+# ~/Library/Application Support is not touched when Fugit.app is replaced.
 
 set -euo pipefail
 
 readonly APP_NAME="Fugit.app"
-readonly ZIP_URL="https://raw.githubusercontent.com/jann5/time_recipt/main/downloads/Fugit.zip"
+readonly ZIP_URL="https://github.com/jann5/fugit/releases/latest/download/Fugit.zip"
 readonly INSTALL_DIR="${FUGIT_INSTALL_DIR:-$HOME/Applications}"
 readonly TARGET_APP="$INSTALL_DIR/$APP_NAME"
 
@@ -24,7 +23,7 @@ trap 'rm -rf "$work_dir"' EXIT
 archive="$work_dir/Fugit.zip"
 unpacked="$work_dir/unpacked"
 
-echo "Pobieram Fugit..."
+echo "Pobieram najnowszy release Fugit..."
 curl --fail --location --retry 2 --output "$archive" "$ZIP_URL"
 
 mkdir -p "$unpacked"
@@ -51,5 +50,5 @@ ditto "$source_app" "$TARGET_APP"
 xattr -dr com.apple.quarantine "$TARGET_APP"
 
 echo "Gotowe: $TARGET_APP"
-echo "Usunięto tylko atrybut com.apple.quarantine z tej kopii aplikacji."
+echo "Aplikacja pochodzi z najnowszego GitHub Release."
 open "$TARGET_APP"
